@@ -18,3 +18,11 @@ export function getDefaultWhatsAppNumber(): string {
 export function isDevelopment(): boolean {
   return process.env.NODE_ENV !== "production";
 }
+
+/** Draft catalog preview is allowed in development and during `next build` when API is offline. */
+export function allowDraftFallback(): boolean {
+  if (isDevelopment()) return true;
+  if (process.env.ALLOW_DRAFT_BUILD_FALLBACK === "1") return true;
+  // Next sets this while generating the production bundle; runtime production stays fail-closed.
+  return process.env.NEXT_PHASE === "phase-production-build";
+}

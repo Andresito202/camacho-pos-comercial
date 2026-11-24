@@ -8,7 +8,11 @@
     "node": ">=22"
   },
   "scripts": {
+    "dev": "pnpm --filter @camacho-pos/web dev",
+    "dev:web": "pnpm --filter @camacho-pos/web dev",
+    "dev:api": "pnpm --filter @camacho-pos-comercial/commercial-api start:dev",
     "build": "pnpm -r --filter @camacho-pos-comercial/contracts --filter @camacho-pos-comercial/configuration --filter @camacho-pos-comercial/database --filter @camacho-pos-comercial/commercial-api run build",
+    "build:web": "pnpm --filter @camacho-pos/web build",
     "start:dev": "pnpm --filter @camacho-pos-comercial/commercial-api start:dev",
     "test": "pnpm -r --filter @camacho-pos-comercial/commercial-api --filter @camacho-pos-comercial/contracts run test",
     "prisma:generate": "pnpm --filter @camacho-pos-comercial/database prisma:generate",
@@ -16,7 +20,8 @@
     "prisma:migrate:deploy": "pnpm --filter @camacho-pos-comercial/database prisma:migrate:deploy",
     "prisma:seed": "pnpm --filter @camacho-pos-comercial/database prisma:seed",
     "db:setup": "pnpm prisma:migrate:deploy && pnpm prisma:seed",
-    "typecheck": "pnpm -r run typecheck"
+    "typecheck": "pnpm -r run typecheck",
+    "typecheck:web": "pnpm --filter @camacho-pos/web typecheck"
   },
   "devDependencies": {
     "typescript": "^5.8.3",

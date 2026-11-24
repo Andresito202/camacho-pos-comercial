@@ -32,9 +32,9 @@ export default async function SolutionDetailPage({ params }: Props) {
           <h1 className="mt-3 font-serif text-4xl">{data.headline}</h1>
           <p className="mt-4 text-lg text-[var(--muted)]">{data.summary}</p>
           <h2 className="mt-8 font-serif text-2xl">Retos del sector</h2>
-          <ul className="mt-3 list-disc space-y-1 pl-5 text-[var(--steel)]">{data.challenges.map((c) => <li key={c}>{c}</li>)}</ul>
+          <ul className="mt-3 list-disc space-y-1 pl-5 text-[var(--steel)]">{data.challenges.map((c: string) => <li key={c}>{c}</li>)}</ul>
           <h2 className="mt-8 font-serif text-2xl">Capacidades</h2>
-          <ul className="mt-3 list-disc space-y-1 pl-5 text-[var(--steel)]">{data.capabilities.map((c) => <li key={c}>{c}</li>)}</ul>
+          <ul className="mt-3 list-disc space-y-1 pl-5 text-[var(--steel)]">{data.capabilities.map((c: string) => <li key={c}>{c}</li>)}</ul>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link href="/solicitar-demo"><Button>Solicitar demo</Button></Link>
             <Link href="/planes"><Button variant="outline">Ver planes</Button></Link>

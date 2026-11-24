@@ -74,7 +74,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             message={settings.data.promoBar.message}
             href={settings.data.promoBar.href}
             cta={settings.data.promoBar.cta}
-            linkAs={(href, label) => (
+            linkAs={(href: string, label: React.ReactNode) => (
               <Link href={href} className="font-semibold underline underline-offset-2">
                 {label}
               </Link>
@@ -82,10 +82,15 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           />
         ) : null}
         <DraftBanner source={settings.source} />
-        <SiteHeader loginHref={login.href} loginBlockedReason={login.reason} />
+        <SiteHeader
+          loginHref={login.href}
+          {...(login.reason ? { loginBlockedReason: login.reason } : {})}
+        />
         <main className="flex-1">{children}</main>
         <SiteFooter />
-        <WhatsAppLauncher number={settings.data.whatsappNumber} />
+        <WhatsAppLauncher
+          {...(settings.data.whatsappNumber ? { number: settings.data.whatsappNumber } : {})}
+        />
       </body>
     </html>
   );

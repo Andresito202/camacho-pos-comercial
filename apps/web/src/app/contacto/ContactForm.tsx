@@ -18,7 +18,7 @@ export function ContactForm() {
         event.preventDefault();
         setPending(true);
         setError(null);
-        const form = new FormData(event.currentTarget);
+        const form = new FormData(event.currentTarget as HTMLFormElement);
         const payload = Object.fromEntries([...form.entries()].map(([k, v]) => [k, String(v)])) as Record<string, string>;
         const result = await submitContact(payload);
         setPending(false);

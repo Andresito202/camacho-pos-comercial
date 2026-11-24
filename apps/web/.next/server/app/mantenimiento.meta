@@ -1,0 +1,15 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/mantenimiento/layout,_N_T_/mantenimiento/page,_N_T_/mantenimiento"
+  },
+  "routeCache": {
+    "key": "/route-cache/APP_PAGE/64a9026677933908fe1ec7e5116e4c1b23419414a875929ee409e7a30415ac64/$/mantenimiento",
+    "owner": {
+      "kind": "APP_PAGE",
+      "sourceRoute": "/mantenimiento/page"
+    },
+    "isFallback": false
+  }
+}

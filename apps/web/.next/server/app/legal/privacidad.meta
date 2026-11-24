@@ -1,0 +1,15 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/legal/layout,_N_T_/legal/privacidad/layout,_N_T_/legal/privacidad/page,_N_T_/legal/privacidad"
+  },
+  "routeCache": {
+    "key": "/route-cache/APP_PAGE/293a8f27a4d4acb7a8ada047f90ee65795726a4703422ec1c0b9b213584c0893/$/legal/privacidad",
+    "owner": {
+      "kind": "APP_PAGE",
+      "sourceRoute": "/legal/privacidad/page"
+    },
+    "isFallback": false
+  }
+}

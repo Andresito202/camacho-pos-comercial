@@ -1,0 +1,15 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/equipos/layout,_N_T_/equipos/[slug]/layout,_N_T_/equipos/[slug]/page,_N_T_/equipos/terminal-tactil-15"
+  },
+  "routeCache": {
+    "key": "/route-cache/APP_PAGE/9f1d25e81cc38a9ffe38f262b1b0d96e9e7331fd88745e0d133cb52fb95cc15c/$/equipos/terminal-tactil-15",
+    "owner": {
+      "kind": "APP_PAGE",
+      "sourceRoute": "/equipos/[slug]/page"
+    },
+    "isFallback": false
+  }
+}

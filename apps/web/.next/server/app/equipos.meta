@@ -1,0 +1,15 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/equipos/layout,_N_T_/equipos/page,_N_T_/equipos"
+  },
+  "routeCache": {
+    "key": "/route-cache/APP_PAGE/dea46be1a895c541cc1a4bd330c635304c14fccb76f7848af1c3beff3dfbf263/$/equipos",
+    "owner": {
+      "kind": "APP_PAGE",
+      "sourceRoute": "/equipos/page"
+    },
+    "isFallback": false
+  }
+}

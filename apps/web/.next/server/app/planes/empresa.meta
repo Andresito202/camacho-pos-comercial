@@ -1,0 +1,15 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/planes/layout,_N_T_/planes/[slug]/layout,_N_T_/planes/[slug]/page,_N_T_/planes/empresa"
+  },
+  "routeCache": {
+    "key": "/route-cache/APP_PAGE/c2e1a1961ac55664699d433157eeb859982d65bca4e3bc1c7b5f2c179a317a8b/$/planes/empresa",
+    "owner": {
+      "kind": "APP_PAGE",
+      "sourceRoute": "/planes/[slug]/page"
+    },
+    "isFallback": false
+  }
+}

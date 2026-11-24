@@ -65,7 +65,7 @@ export default async function ContratarPage({ searchParams }: Props) {
             <Link href="/checkout">
               <Button variant="secondary">Checkout</Button>
             </Link>
-            <WhatsAppHire planId={selected.id} city={ciudad} />
+            <WhatsAppHire planId={selected.id} planSlug={selected.slug} {...(ciudad ? { city: ciudad } : {})} />
           </div>
         </div>
       ) : null}

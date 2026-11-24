@@ -1,0 +1,15 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/soluciones/layout,_N_T_/soluciones/[slug]/layout,_N_T_/soluciones/[slug]/page,_N_T_/soluciones/droguerias"
+  },
+  "routeCache": {
+    "key": "/route-cache/APP_PAGE/9f5d3510a3172668ec6911cf6ab5d1b11d0890c098ea39802e6a1177395379a0/$/soluciones/droguerias",
+    "owner": {
+      "kind": "APP_PAGE",
+      "sourceRoute": "/soluciones/[slug]/page"
+    },
+    "isFallback": false
+  }
+}
