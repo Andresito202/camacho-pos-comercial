@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 import { getBlogPosts, getCoverage, getEquipmentList, getPlans, getSolutions } from "@/lib/api";
-import { getSiteUrl } from "@/lib/env";
+import { getSiteUrl, isStaging } from "@/lib/env";
 
 const STATIC = [
   "/",
@@ -29,6 +29,9 @@ const STATIC = [
 ];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  // Staging must not advertise URLs for crawling.
+  if (isStaging()) return [];
+
   const site = getSiteUrl();
   const [plans, equipment, coverage, solutions, blog] = await Promise.all([
     getPlans().catch(() => ({ data: [] })),

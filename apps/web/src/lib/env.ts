@@ -15,6 +15,23 @@ export function getSiteUrl(): string {
   return process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || "http://127.0.0.1:3000";
 }
 
+/**
+ * Staging must stay noindex (DNS proposal + nginx + Next robots/metadata).
+ * Detect via DEPLOY_ENV / NEXT_PUBLIC_DEPLOY_ENV or a staging.* hostname.
+ */
+export function isStaging(): boolean {
+  const deploy =
+    process.env.NEXT_PUBLIC_DEPLOY_ENV?.trim().toLowerCase() ||
+    process.env.DEPLOY_ENV?.trim().toLowerCase();
+  if (deploy === "staging") return true;
+  try {
+    const host = new URL(getSiteUrl()).hostname.toLowerCase();
+    return host === "staging" || host.startsWith("staging.") || host.includes(".staging.");
+  } catch {
+    return false;
+  }
+}
+
 export function getCentralAuthorityOrigin(): string | null {
   const value = process.env.NEXT_PUBLIC_CENTRAL_AUTHORITY_ORIGIN?.replace(/\/$/, "");
   return value || null;

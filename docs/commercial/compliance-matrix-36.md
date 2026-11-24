@@ -3,9 +3,11 @@
 **Baseline HEAD (before Phase 2 fixes):** `9a7b371ebe7dd99a04f8c75dffb90358e2e4524c`  
 **Branch:** `feat/commercial-platform-foundation`  
 **Evidence captured:** 2026-11-24T03:42:31Z (UTC)  
+**Phase 3 Block D evidence (UTC):** 2026-11-24T04:06Z–04:09Z on HEAD `c6a3842` + web rebuild (`pnpm build:web` / `next start`)  
 **Runtime observed:** API `:4000`, web `:3000`, Postgres `camacho_pos_comercial` with **4** plans (`esencial`, `profesional`, `empresarial`, `perpetua`), all `DRAFT`.
 
-Statuses are exclusive. File/route/Prisma presence alone does **not** mean complete.
+Statuses are exclusive. File/route/Prisma presence alone does **not** mean complete.  
+Phase 3 delivery labels (Block D): see `docs/commercial/phase3-delivery.md` (`IMPLEMENTADO` / `PROBADO` / `PARCIAL` / `BLOQUEADO` / `PENDIENTE`).
 
 | # | Section | Status | Evidence note (concise) |
 |---:|---|---|---|
@@ -32,16 +34,16 @@ Statuses are exclusive. File/route/Prisma presence alone does **not** mean compl
 | 21 | SOPORTE Y PANEL DE DUDAS | Implementación parcial | Páginas `/soporte`/`/preguntas-frecuentes` + tickets API; FAQ publicados vía API = `[]` (seed no PUBLISHED). |
 | 22 | GARANTÍAS, PRIVACIDAD Y POLÍTICAS | Implementación parcial | Rutas `/legal/*` 200 con borradores estáticos; docs legales DB no servidos como PUBLISHED binding. |
 | 23 | COOKIES Y ANALÍTICA | Implementación parcial | `POST /v1/consent` 201 (COOKIES); sin banner de consentimiento FE ni gated analytics real. |
-| 24 | SEO PROFESIONAL Y TÉCNICO | Implementación parcial | `metadata`, `sitemap.ts`, `robots.ts`, JSON-LD parcial; Search Console / scores no medidos. |
+| 24 | SEO PROFESIONAL Y TÉCNICO | Implementado y probado | HTML prod auditado (`/`, `/planes`, `/equipos`, `/soluciones/tiendas`): titles/desc/canonical/OG/H1 únicos; robots noindex admin/carrito/checkout; staging `isStaging()` noindex; JSON-LD sin reviews falsos. Search Console **PENDIENTE**. |
 | 25 | INVESTIGACIÓN DE PALABRAS CLAVE | Implementado sin evidencia | Solo `docs/seo/keyword-hypotheses.md`; sin validación de volumen/ranking. |
 | 26 | BLOG Y CONTENIDO COMERCIAL | Implementación parcial | Rutas `/blog` 200; 1 post DRAFT en DB → `GET /v1/content/blog` = `[]`. Artículos iniciales incompletos. |
 | 27 | REDES SOCIALES Y CONTACTO | Implementación parcial | Contacto/WhatsApp presentes; `SocialLink` seed no PUBLISHED → API social `[]`. |
 | 28 | NOTIFICACIONES | Implementación parcial | Outbox + worker **stub** (marca SENT sin proveedor real). |
-| 29 | SEGURIDAD | Implementación parcial | Fail-closed admin, anti-tamper precios, webhook key, validación Zod; HTTPS prod / CSRF completo / secret scanning CI remoto no acreditados aquí. |
-| 30 | RENDIMIENTO Y ACCESIBILIDAD | Pendiente | Objetivos Lighthouse/CWV **no medidos** en este entorno. |
+| 29 | SEGURIDAD | Implementación parcial | Fail-closed admin, anti-tamper, webhook key, Zod; scan local Phase 3 en `docs/security/public-repo-scan-phase3.md` (sin secretos live). HTTPS prod / CSRF completo / secret scanning CI remoto **no** acreditados. |
+| 30 | RENDIMIENTO Y ACCESIBILIDAD | Implementación parcial | Lighthouse 13.6.0 real en `/` y `/planes` desktop+mobile — ver `docs/testing/lighthouse-phase3.md` (perf 100; home a11y 92; SEO 100). CWV de campo / Search Console **PENDIENTE**. |
 | 31 | DESPLIEGUE E INFRAESTRUCTURA | Implementado sin evidencia | `docker-compose.yml` + nginx/runbooks presentes; Docker **no instalado** aquí; compose no ejecutado en esta sesión. |
 | 32 | PRUEBAS OBLIGATORIAS | Implementación parcial | Vitest contratos+API y smoke manual observados históricamente; E2E Playwright es esqueleto; lista mandatoria de la misión incompleta. |
-| 33 | VALIDACIÓN VISUAL | Implementado y probado | 72 capturas en `docs/testing/screenshots/` (multi-viewport). |
+| 33 | VALIDACIÓN VISUAL | Implementado y probado | Capturas históricas multi-viewport + Phase 3 prod en `docs/testing/screenshots-phase3/` (inicio, planes monthly, equipos, modal, admin × 1920/390). |
 | 34 | ORDEN DE EJECUCIÓN | Implementación parcial | Fundación (bloques 0–2-ish) materializada; bloques posteriores (pago live, Central, DNS, entrega GH) abiertos. |
 | 35 | CRITERIOS DE ACEPTACIÓN | Pendiente | Criterios de “completo” de la misión **no** cumplidos (repo privado, cobros, aprovisionamiento, DNS, etc.). |
 | 36 | ENTREGA FINAL | Bloqueado por dependencia externa | Sin URL de repo privado, sin PR remoto, sin entrega formal; HEAD local = baseline `9a7b371`. |
@@ -50,11 +52,13 @@ Statuses are exclusive. File/route/Prisma presence alone does **not** mean compl
 
 | Status | # |
 |---|---:|
-| Implementado y probado | 8 |
+| Implementado y probado | 9 |
 | Implementado sin evidencia | 2 |
 | Implementación parcial | 20 |
-| Pendiente | 2 |
+| Pendiente | 1 |
 | Bloqueado por dependencia externa | 4 |
+
+Counts after Phase 3 Block D: SEO (#24) moved to *Implementado y probado*; Rendimiento (#30) *Pendiente* → *Implementación parcial*; Seguridad (#29) y Validación visual (#33) actualizados en nota sin cambio de bucket para #29/#33.
 
 ---
 
