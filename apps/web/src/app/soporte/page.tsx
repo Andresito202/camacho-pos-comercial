@@ -21,7 +21,7 @@ export default function SoportePage() {
       </p>
       <div className="mt-8 grid gap-4 md:grid-cols-3">
         {[
-          { t: "Instalación", d: "Guías Electron y Android en Descargas.", href: "/descargas" },
+          { t: "Instalación", d: "Guías Windows y Android en Descargas.", href: "/descargas" },
           { t: "FAQ", d: "Respuestas sobre venta sin internet, roles y facturación.", href: "/preguntas-frecuentes" },
           { t: "Contacto", d: "Correo y formulario comercial.", href: "/contacto" },
         ].map((item) => (

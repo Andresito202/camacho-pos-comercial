@@ -12,7 +12,13 @@ export const metadata = buildMetadata({
   path: "/planes",
 });
 
-export default async function PlanesPage() {
+export default async function PlanesPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ solucion?: string }>;
+}) {
+  const params = searchParams ? await searchParams : undefined;
+  const initialSolutionMode = params?.solucion === "completo" ? "COMPLETE" : "SOFTWARE";
   const [plans, equipment] = await Promise.all([getPlans(), getEquipmentList()]);
   const visible = plans.data.filter((p) => isCatalogVisible(p.status));
   const kits = equipment.data.filter((item) => item.category === "Kit" || Boolean(item.kitId));
@@ -41,8 +47,8 @@ export default async function PlanesPage() {
             Licencias claras para cada etapa de tu negocio
           </h1>
           <p className="mt-5 max-w-2xl text-lg text-white/75">
-            Elige solo software o POS completo, y compara mensual, anual o pago único. Los precios de referencia se
-            confirman al publicar la oferta comercial.
+            Elige solo software o POS completo, y compara mensual o anual. La licencia perpetua se presenta aparte. Los
+            precios de referencia se confirman al publicar la oferta comercial.
           </p>
         </div>
       </section>
@@ -52,7 +58,7 @@ export default async function PlanesPage() {
         lead="Tres planes recurrentes juntos; la licencia perpetua se presenta aparte. Una licencia = una caja."
       >
         {visible.length > 0 ? (
-          <PlanCatalog plans={visible} kits={kits} />
+          <PlanCatalog plans={visible} kits={kits} initialSolutionMode={initialSolutionMode} />
         ) : (
           <p className="text-[var(--muted)]">No hay planes visibles en el catálogo en este momento.</p>
         )}

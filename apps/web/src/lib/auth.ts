@@ -15,7 +15,7 @@ export function getLoginHref(returnTo = "/admin"): { href: string | null; reason
     return {
       href: null,
       reason:
-        "El inicio de sesión requiere Central Authority. Configure NEXT_PUBLIC_CENTRAL_AUTHORITY_ORIGIN para habilitar el flujo oficial.",
+        "El inicio de sesión aún no está disponible en este entorno. Un asesor puede ayudarte por WhatsApp o contacto.",
     };
   }
   const url = new URL("/login", origin);
@@ -68,19 +68,19 @@ export function postLoginDestination(role: string | undefined): {
       return {
         href: "/soporte",
         label: "Centro de soporte",
-        note: "Administrador/supervisor no son cajeros. La operación de caja ocurre en Electron o Android.",
+        note: "Administrador/supervisor no son cajeros. La operación de caja ocurre en Windows o Android.",
       };
     case "CAJERO":
       return {
         href: "/descargas",
         label: "Descargas e instalación",
-        note: "No existe POS web para cajero. Instala Electron (Windows) o la app Android del kit contratado.",
+        note: "No existe POS web para cajero. Instala la app Windows o Android del kit contratado.",
       };
     default:
       return {
         href: "/descargas",
         label: "Continuar",
-        note: "Tras autenticarte en Central, el destino depende de tu rol firmado. Cajeros usan Electron/Android.",
+        note: "Tras iniciar sesión, el destino depende de tu rol. Los cajeros usan la app Windows o Android.",
       };
   }
 }

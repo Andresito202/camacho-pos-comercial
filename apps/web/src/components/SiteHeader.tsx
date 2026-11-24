@@ -8,7 +8,7 @@ import { useCart } from "@/lib/cart-store";
 
 const NAV = [
   { href: "/software-pos", label: "Software POS" },
-  { href: "/planes", label: "Planes y precios" },
+  { href: "/planes", label: "Planes" },
   { href: "/equipos", label: "Equipos" },
   { href: "/soluciones", label: "Soluciones" },
   { href: "/cobertura", label: "Cobertura" },
@@ -25,16 +25,26 @@ export function SiteHeader({
   const [open, setOpen] = useState(false);
   const { count } = useCart();
 
+  function goLogin() {
+    if (loginHref) {
+      window.location.href = loginHref;
+      return;
+    }
+    window.alert(
+      loginBlockedReason ?? "El inicio de sesión requiere el servicio de acceso configurado.",
+    );
+  }
+
   return (
-    <header className="sticky top-0 z-30 border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--ivory)_88%,white)] backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
-        <Link href="/" className="flex items-center gap-3" aria-label="Camacho POS Colombia — inicio">
+    <header className="sticky top-0 z-30 border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--ivory)_90%,white)] backdrop-blur">
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-2.5 sm:px-6 lg:px-8">
+        <Link href="/" className="flex shrink-0 items-center gap-3" aria-label="Camacho POS Colombia — inicio">
           <Image
             src="/brand/logo-yellow.png"
             alt="Camacho POS Colombia"
-            width={220}
-            height={78}
-            className="h-12 w-auto sm:h-14"
+            width={200}
+            height={72}
+            className="h-10 w-auto sm:h-11"
             priority
           />
         </Link>
@@ -51,10 +61,10 @@ export function SiteHeader({
           ))}
         </nav>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
           <Link
             href="/carrito"
-            className="relative rounded-md px-3 py-2 text-sm font-medium text-[var(--navy)] hover:bg-[color-mix(in_srgb,var(--navy)_6%,transparent)]"
+            className="relative rounded-md px-2.5 py-2 text-sm font-medium text-[var(--navy)] hover:bg-[color-mix(in_srgb,var(--navy)_6%,transparent)]"
             aria-label={`Carrito${count ? `, ${count} artículos` : ""}`}
           >
             Carrito
@@ -65,24 +75,9 @@ export function SiteHeader({
             ) : null}
           </Link>
 
-          {loginHref ? (
-            <Button size="sm" onClick={() => { window.location.href = loginHref; }}>
-              Iniciar sesión
-            </Button>
-          ) : (
-            <Button
-              size="sm"
-              title={loginBlockedReason}
-              onClick={() => {
-                window.alert(
-                  loginBlockedReason ??
-                    "El inicio de sesión requiere el servicio de acceso configurado.",
-                );
-              }}
-            >
-              Iniciar sesión
-            </Button>
-          )}
+          <Button size="sm" title={loginBlockedReason} onClick={goLogin}>
+            Iniciar sesión
+          </Button>
 
           <button
             type="button"
@@ -91,23 +86,40 @@ export function SiteHeader({
             aria-controls="mobile-nav"
             onClick={() => setOpen((value) => !value)}
           >
-            Menú
+            {open ? "Cerrar" : "Menú"}
           </button>
         </div>
       </div>
 
       {open ? (
-        <nav id="mobile-nav" className="border-t border-[var(--border)] px-4 py-3 lg:hidden" aria-label="Móvil">
-          <ul className="space-y-2">
+        <nav id="mobile-nav" className="border-t border-[var(--border)] bg-[var(--ivory)] px-4 py-3 lg:hidden" aria-label="Móvil">
+          <ul className="space-y-1">
             {NAV.map((item) => (
               <li key={item.href}>
-                <Link href={item.href} className="block py-2 text-sm font-semibold" onClick={() => setOpen(false)}>
+                <Link
+                  href={item.href}
+                  className="block rounded-md px-2 py-2.5 text-sm font-semibold text-[var(--navy)] hover:bg-white/70"
+                  onClick={() => setOpen(false)}
+                >
                   {item.label}
                 </Link>
               </li>
             ))}
             <li>
-              <Link href="/buscar" className="block py-2 text-sm font-medium" onClick={() => setOpen(false)}>
+              <Link
+                href="/solicitar-demo"
+                className="block rounded-md px-2 py-2.5 text-sm font-medium text-[var(--teal)]"
+                onClick={() => setOpen(false)}
+              >
+                Solicitar demo
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/buscar"
+                className="block rounded-md px-2 py-2.5 text-sm font-medium"
+                onClick={() => setOpen(false)}
+              >
                 Buscar
               </Link>
             </li>

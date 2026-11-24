@@ -78,7 +78,7 @@ const FEATURE_MATRIX: Array<{
     label: "Vende incluso cuando se interrumpe internet",
     description: "Tu punto de venta sigue atendiendo clientes aunque falle la conexión",
     status: FeatureCommercialStatus.AVAILABLE,
-    claimNote: "AVAILABLE as commercial claim only where verified from POS runtime evidence; not a blanket production certification. Technical: local-first sales.",
+    claimNote: "AVAILABLE as commercial claim only where verified from POS runtime evidence; not a blanket production certification. Continuity of local sales.",
     plans: ["esencial", "profesional", "empresarial", "perpetua"],
   },
   {
@@ -86,7 +86,7 @@ const FEATURE_MATRIX: Array<{
     label: "Tu caja sigue operando en el local",
     description: "La operación de mostrador no se detiene por un corte breve de red",
     status: FeatureCommercialStatus.AVAILABLE,
-    claimNote: "Claim limited to architectures already implemented in POS (SQLite single-writer / POS Local Service); commercial portal does not re-verify. Hidden from public bullets — merged into merchant continuity messaging.",
+    claimNote: "Claim limited to local POS runtime architecture already implemented; commercial portal does not re-verify. Hidden from public bullets — merged into merchant continuity messaging.",
     plans: ["esencial", "profesional", "empresarial", "perpetua"],
     hideFromPublicBullets: true,
   },
@@ -111,7 +111,7 @@ const FEATURE_MATRIX: Array<{
     label: "Sincroniza información cuando recuperes la conexión",
     description: "Los datos del local se actualizan con la nube al volver internet",
     status: FeatureCommercialStatus.IN_CERTIFICATION,
-    claimNote: "Persistence gate exists on POS line (Central Sync); commercial claim stays IN_CERTIFICATION until portal E2E evidence.",
+    claimNote: "Persistence/sync gate exists on POS line; commercial claim stays IN_CERTIFICATION until portal E2E evidence.",
     plans: ["profesional", "empresarial", "perpetua"],
   },
   {
@@ -378,10 +378,13 @@ async function seedKits() {
     create: {
       slug: "kits-pos",
       name: "Kits POS",
-      description: "Kits de hardware + licencia (precios DRAFT)",
+      description: "Kits de equipos + licencia para arrancar tu caja",
       publicationStatus: PublicationStatus.DRAFT,
     },
-    update: { publicationStatus: PublicationStatus.DRAFT },
+    update: {
+      description: "Kits de equipos + licencia para arrancar tu caja",
+      publicationStatus: PublicationStatus.DRAFT,
+    },
   });
 
   const kits = [
@@ -397,13 +400,14 @@ async function seedKits() {
         slug: k.slug,
         sku: k.sku,
         name: k.name,
-        description: `${k.name} — precio provisional DRAFT. No cobrable hasta aprobación.`,
+        description: `${k.name}: equipos de referencia + 1 licencia. Precio de referencia pendiente de publicación comercial.`,
         kind: ProductKind.KIT,
         categoryId: category.id,
         publicationStatus: PublicationStatus.DRAFT,
       },
       update: {
         name: k.name,
+        description: `${k.name}: equipos de referencia + 1 licencia. Precio de referencia pendiente de publicación comercial.`,
         publicationStatus: PublicationStatus.DRAFT,
         categoryId: category.id,
       },
@@ -461,7 +465,7 @@ async function seedKits() {
     { slug: "cajones", name: "Cajones", description: "Cajones monederos para POS" },
     { slug: "lectores", name: "Lectores", description: "Lectores de código de barras" },
     { slug: "balanzas", name: "Balanzas", description: "Balanzas comerciales" },
-    { slug: "terminales-windows", name: "Terminales Windows", description: "PCs / all-in-one para Electron" },
+    { slug: "terminales-windows", name: "Terminales Windows", description: "PCs / all-in-one para caja en Windows" },
     { slug: "terminales-android", name: "Terminales Android", description: "Tablets / terminales Android" },
     { slug: "accesorios", name: "Accesorios", description: "Cables, soportes y consumibles" },
     { slug: "kits-pos", name: "Kits POS", description: "Kits de hardware + licencia" },
@@ -519,7 +523,7 @@ async function seedKits() {
       amount: 350000,
       image: "/images/hardware/impresora-termica.svg",
       kind: ProductKind.HARDWARE,
-      description: "Ilustración SVG de referencia (no foto de modelo real). Precio DRAFT — no cobrable.",
+      description: "Ilustración referencial de impresora térmica 80 mm. El modelo exacto se confirma al contratar.",
       stock: 12,
     },
     {
@@ -530,7 +534,7 @@ async function seedKits() {
       amount: 220000,
       image: "/images/hardware/impresora-termica.svg",
       kind: ProductKind.HARDWARE,
-      description: "Ilustración SVG de referencia. Precio DRAFT.",
+      description: "Ilustración referencial de impresora térmica 58 mm. El modelo exacto se confirma al contratar.",
       stock: 20,
     },
     {
@@ -541,7 +545,7 @@ async function seedKits() {
       amount: 180000,
       image: "/images/hardware/cajon-monedero.svg",
       kind: ProductKind.HARDWARE,
-      description: "Ilustración SVG de referencia. Precio DRAFT.",
+      description: "Ilustración referencial de cajón monedero. Compatible con kits de caja Camacho POS.",
       stock: 15,
     },
     {
@@ -552,7 +556,7 @@ async function seedKits() {
       amount: 95000,
       image: "/images/hardware/lector-barras.svg",
       kind: ProductKind.HARDWARE,
-      description: "Ilustración SVG de referencia. Precio DRAFT.",
+      description: "Ilustración referencial de lector USB. Ideal para mostrador y recepción.",
       stock: 30,
     },
     {
@@ -563,7 +567,7 @@ async function seedKits() {
       amount: 210000,
       image: "/images/hardware/lector-barras.svg",
       kind: ProductKind.HARDWARE,
-      description: "Ilustración SVG de referencia. Precio DRAFT.",
+      description: "Ilustración referencial de lector inalámbrico para movilidad en el local.",
       stock: 10,
     },
     {
@@ -574,7 +578,7 @@ async function seedKits() {
       amount: 420000,
       image: "/images/hardware/balanza.svg",
       kind: ProductKind.HARDWARE,
-      description: "Ilustración SVG de referencia. Precio DRAFT.",
+      description: "Ilustración referencial de balanza comercial. Disponibilidad según sector y certificación.",
       stock: 8,
     },
     {
@@ -585,7 +589,7 @@ async function seedKits() {
       amount: 1890000,
       image: "/images/hardware/terminal-tactil.svg",
       kind: ProductKind.HARDWARE,
-      description: "Ilustración SVG genérica (no foto de modelo). Para Electron POS. Precio DRAFT.",
+      description: "Ilustración referencial de terminal all-in-one para caja en Windows.",
       stock: 5,
     },
     {
@@ -596,7 +600,7 @@ async function seedKits() {
       amount: 1450000,
       image: "/images/hardware/terminal-tactil.svg",
       kind: ProductKind.HARDWARE,
-      description: "Ilustración SVG genérica. Precio DRAFT.",
+      description: "Ilustración referencial de mini PC Windows con monitor para mostrador.",
       stock: 7,
     },
     {
@@ -607,7 +611,7 @@ async function seedKits() {
       amount: 980000,
       image: "/images/hardware/terminal-tactil.svg",
       kind: ProductKind.HARDWARE,
-      description: "Ilustración SVG genérica para companion Android. Precio DRAFT.",
+      description: "Ilustración referencial de tablet Android para operación de caja.",
       stock: 9,
     },
     {
@@ -618,7 +622,7 @@ async function seedKits() {
       amount: 75000,
       image: "/images/hardware/terminal-tactil.svg",
       kind: ProductKind.ACCESSORY,
-      description: "Ilustración SVG de referencia. Precio DRAFT.",
+      description: "Ilustración referencial de soporte para tablet en mostrador.",
       stock: 25,
     },
     {
@@ -629,7 +633,7 @@ async function seedKits() {
       amount: 65000,
       image: "/images/hardware/impresora-termica.svg",
       kind: ProductKind.ACCESSORY,
-      description: "Consumible. Ilustración SVG. Precio DRAFT.",
+      description: "Consumible de referencia: rollos térmicos 80 mm (caja x50).",
       stock: 40,
     },
   ];
@@ -759,7 +763,7 @@ async function seedPromotions() {
     {
       code: "BLACK-FRIDAY",
       name: "Black Friday",
-      description: "Campaña Black Friday (DRAFT/scheduled). Ventana relativa a ahora en America/Bogota.",
+      description: "Descuentos especiales de temporada en planes y kits seleccionados.",
       startDays: -3,
       endDays: 4,
       status: PublicationStatus.DRAFT,
@@ -768,7 +772,7 @@ async function seedPromotions() {
     {
       code: "CYBER-MONDAY",
       name: "Cyber Monday",
-      description: "Campaña Cyber Monday (DRAFT). Activa en staging esta semana.",
+      description: "Promoción de inicio de semana en software y equipos.",
       startDays: -1,
       endDays: 2,
       status: PublicationStatus.DRAFT,
@@ -777,7 +781,7 @@ async function seedPromotions() {
     {
       code: "LANZAMIENTO",
       name: "Lanzamiento portal",
-      description: "Promoción de lanzamiento del portal comercial (DRAFT, activa).",
+      description: "Beneficio de lanzamiento al contratar tu primer plan Camacho POS.",
       startDays: -14,
       endDays: 45,
       status: PublicationStatus.DRAFT,
@@ -786,7 +790,7 @@ async function seedPromotions() {
     {
       code: "ANUAL",
       name: "Descuento plan anual",
-      description: "Incentivo DRAFT por contratar intervalo ANUAL. Activa en staging.",
+      description: "Ahorra al contratar el plan con pago anual.",
       startDays: -7,
       endDays: 60,
       status: PublicationStatus.DRAFT,
@@ -795,7 +799,7 @@ async function seedPromotions() {
     {
       code: "KIT-DISCOUNT",
       name: "Descuento en kits",
-      description: "Descuento provisional sobre kits de hardware (DRAFT, activa).",
+      description: "Descuento especial sobre kits de equipos seleccionados.",
       startDays: -2,
       endDays: 30,
       status: PublicationStatus.DRAFT,
@@ -803,8 +807,8 @@ async function seedPromotions() {
     },
     {
       code: "FUTURE-SAMPLE",
-      name: "Campaña programada (futura)",
-      description: "Ejemplo scheduled futuro — no activa aún.",
+      name: "Campaña programada",
+      description: "Próxima campaña comercial — aún no vigente.",
       startDays: 30,
       endDays: 60,
       status: PublicationStatus.DRAFT,
@@ -876,9 +880,9 @@ async function seedContent() {
       whatsappNumber: "573000000000_DEV_PLACEHOLDER",
       supportEmail: "soporte@camachoposcolombia.com",
       logoUrl: "/brand/logo-stacked.png",
-      promoBannerMessage: "Promociones de staging activas — precios DRAFT, no cobrables.",
+      promoBannerMessage: "Kit de apertura con instalación remota incluida este mes.",
       promoBannerHref: "/promociones",
-      promoBannerCta: "Ver promociones",
+      promoBannerCta: "Ver promoción",
       publicationStatus: PublicationStatus.DRAFT,
     },
     update: {
@@ -888,9 +892,9 @@ async function seedContent() {
       secondaryColor: "#F5C518",
       accentColor: "#1A5C45",
       whatsappNumber: "573000000000_DEV_PLACEHOLDER",
-      promoBannerMessage: "Promociones de staging activas — precios DRAFT, no cobrables.",
+      promoBannerMessage: "Kit de apertura con instalación remota incluida este mes.",
       promoBannerHref: "/promociones",
-      promoBannerCta: "Ver promociones",
+      promoBannerCta: "Ver promoción",
       publicationStatus: PublicationStatus.DRAFT,
     },
   });

@@ -11,7 +11,7 @@ export function EquipmentCard({
   allowDraftCart = false,
 }: {
   item: Equipment;
-  /** Staging: allow cart composition for borrador when variant/kit ids exist (checkout still rejects DRAFT). */
+  /** Staging: allow cart composition for borrador when variant/kit ids exist (checkout still rejects unpublished prices). */
   allowDraftCart?: boolean;
 }) {
   const canAdd =
@@ -25,11 +25,14 @@ export function EquipmentCard({
       <div className="relative aspect-[16/10] bg-[var(--ivory)]">
         <Image
           src={item.image}
-          alt={`${item.name} — ilustración SVG`}
+          alt={`${item.name} — ilustración referencial`}
           fill
           className="object-contain p-4"
           sizes="(max-width:768px) 100vw, 33vw"
         />
+        <p className="absolute bottom-2 left-2 rounded bg-[var(--navy)]/85 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--ivory)]">
+          Ilustración referencial
+        </p>
       </div>
       <div className="flex flex-1 flex-col p-5">
         <div className="mb-3 flex items-start justify-between gap-3">

@@ -45,10 +45,16 @@ export function SiteFooter() {
     <footer className="mt-auto border-t border-[var(--border)] bg-[var(--navy)] text-[var(--ivory)]">
       <div className="mx-auto grid max-w-6xl gap-10 px-4 py-14 sm:px-6 md:grid-cols-[1.2fr_repeat(4,1fr)] lg:px-8">
         <div>
-          <Image src="/brand/logo-stacked.png" alt="Camacho POS Colombia" width={120} height={120} className="mb-4 rounded-lg bg-white/5 p-2" />
+          <Image
+            src="/brand/logo-stacked.png"
+            alt="Camacho POS Colombia"
+            width={96}
+            height={96}
+            className="mb-4 h-16 w-auto rounded-lg bg-white/5 p-2"
+          />
           <p className="font-serif text-2xl">Camacho POS Colombia</p>
           <p className="mt-3 max-w-xs text-sm text-white/70">
-            Contabilidad y precisión siempre. Software POS y kits de hardware para el comercio colombiano.
+            Contabilidad y precisión siempre. Software POS y kits de equipos para el comercio colombiano.
           </p>
         </div>
         {COLUMNS.map((column) => (

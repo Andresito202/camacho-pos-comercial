@@ -26,7 +26,7 @@ export default async function ContratarPage({ searchParams }: Props) {
       <DraftBanner source={plans.source} />
       <h1 className="font-serif text-4xl">Contratar Camacho POS</h1>
       <p className="mt-3 text-lg text-[var(--muted)]">
-        Selecciona un plan Disponible, agrégalo al carrito con su id real y completa checkout. Cajeros instalarán Electron o
+        Selecciona un plan Disponible, agrégalo al carrito y completa el checkout. Los cajeros instalarán la app en Windows o
         Android después del alta — no hay POS web de mostrador.
       </p>
       {ciudad ? <p className="mt-2 text-sm text-[var(--teal)]">Ciudad de interés: {ciudad}</p> : null}

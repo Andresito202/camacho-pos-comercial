@@ -20,7 +20,7 @@ function resolvePrice(plan: Plan, interval: BillingInterval) {
       interval,
     };
   }
-  if (interval === "MONTHLY" && plan.priceMonthly) {
+  if (interval === "MONTHLY" && plan.priceMonthly && plan.primaryInterval !== "PERPETUAL") {
     return {
       money: plan.priceMonthly,
       planPriceId: plan.planPriceId,
@@ -113,8 +113,8 @@ function CommercialPlanCard({
   solutionMode: SolutionMode;
 }) {
   const priced = planForInterval(plan, interval);
-  if (!priced) return null;
   const cajas = plan.licensesPerUnit ?? 1;
+  const displayPlan = priced ?? plan;
 
   return (
     <article className="flex h-full flex-col border-t-4 border-[var(--yellow)] bg-white/80 p-6 shadow-[0_1px_0_rgba(16,28,45,0.06)]">
@@ -125,10 +125,14 @@ function CommercialPlanCard({
         </div>
         <StatusBadge status={plan.status} />
       </div>
-      <p className="font-serif text-3xl text-[var(--navy)]">
-        {formatMoney(priced.priceMonthly)}
-        <span className="text-base font-sans text-[var(--muted)]">{intervalSuffix(interval)}</span>
-      </p>
+      {priced ? (
+        <p className="font-serif text-3xl text-[var(--navy)]">
+          {formatMoney(priced.priceMonthly)}
+          <span className="text-base font-sans text-[var(--muted)]">{intervalSuffix(interval)}</span>
+        </p>
+      ) : (
+        <p className="font-serif text-2xl text-[var(--navy)]">Consulta comercial</p>
+      )}
       <ul className="mt-4 space-y-1.5 text-sm text-[var(--steel)]">
         <li>
           <span className="text-[var(--teal)]">✓</span> {cajas} caja{cajas === 1 ? "" : "s"} por licencia
@@ -156,13 +160,23 @@ function CommercialPlanCard({
         ))}
       </ul>
       <div className="mt-6 flex flex-wrap gap-2">
-        <HireModalTrigger plan={priced} modality={interval} solutionType={solutionMode} />
-        <HireModalTrigger
-          plan={priced}
-          modality={interval}
-          solutionType={solutionMode}
-          intent="whatsapp"
-        />
+        {priced ? (
+          <>
+            <HireModalTrigger plan={displayPlan} modality={interval} solutionType={solutionMode} />
+            <HireModalTrigger
+              plan={displayPlan}
+              modality={interval}
+              solutionType={solutionMode}
+              intent="whatsapp"
+            />
+          </>
+        ) : (
+          <Link href="/contacto">
+            <Button size="sm" variant="outline">
+              Consulta comercial
+            </Button>
+          </Link>
+        )}
         <Link
           href={`/planes/${plan.slug}`}
           className="inline-flex items-center px-3 text-sm font-medium text-[var(--teal)] underline-offset-2 hover:underline"
@@ -195,7 +209,7 @@ function ComparisonTable({ plans }: { plans: Plan[] }) {
       <table className="min-w-full text-left text-sm">
         <thead className="border-b border-[var(--border)] bg-[var(--navy)] text-[var(--ivory)]">
           <tr>
-            <th className="px-4 py-3 font-medium">Característica</th>
+            <th className="px-4 py-3 font-medium">Qué incluye</th>
             {plans.map((plan) => (
               <th key={plan.slug} className="px-4 py-3 font-medium">
                 {plan.name}
@@ -211,7 +225,7 @@ function ComparisonTable({ plans }: { plans: Plan[] }) {
                 const feature = row.byPlan[plan.slug];
                 return (
                   <td key={plan.slug} className="px-4 py-3 text-[var(--steel)]">
-                    {feature ? featureStatusLabel(feature.commercialStatus) : "—"}
+                    {feature ? featureStatusLabel(feature.commercialStatus) : "No incluido"}
                   </td>
                 );
               })}
@@ -226,30 +240,21 @@ function ComparisonTable({ plans }: { plans: Plan[] }) {
 export function PlanCatalog({
   plans,
   kits,
+  initialSolutionMode = "SOFTWARE",
 }: {
   plans: Plan[];
   kits: Equipment[];
+  initialSolutionMode?: SolutionMode;
 }) {
-  const [solutionMode, setSolutionMode] = useState<SolutionMode>("SOFTWARE");
-  const [interval, setInterval] = useState<BillingInterval>("MONTHLY");
+  const [solutionMode, setSolutionMode] = useState<SolutionMode>(initialSolutionMode);
+  const [interval, setInterval] = useState<Exclude<BillingInterval, "PERPETUAL">>("MONTHLY");
 
-  const recurring = plans.filter((p) => p.slug !== "perpetua" && Boolean(resolvePrice(p, interval === "PERPETUAL" ? "MONTHLY" : interval) || resolvePrice(p, "MONTHLY")));
-  const perpetual = plans.find((p) => p.slug === "perpetua" || Boolean(p.prices?.PERPETUAL || p.primaryInterval === "PERPETUAL"));
-
-  const showRecurring = interval !== "PERPETUAL";
-  const showPerpetual = interval === "PERPETUAL";
-
-  const recurringPriced = showRecurring
-    ? recurring
-        .map((p) => planForInterval(p, interval))
-        .filter((p): p is Plan => Boolean(p))
-    : [];
-
-  const comparisonPlans = showPerpetual
-    ? perpetual
-      ? [perpetual]
-      : []
-    : recurring;
+  const recurring = plans.filter(
+    (p) => p.slug !== "perpetua" && !(p.prices?.PERPETUAL && !p.prices?.MONTHLY && !p.prices?.ANNUAL),
+  );
+  const perpetual = plans.find(
+    (p) => p.slug === "perpetua" || Boolean(p.prices?.PERPETUAL || p.primaryInterval === "PERPETUAL"),
+  );
 
   return (
     <div>
@@ -270,7 +275,6 @@ export function PlanCatalog({
           options={[
             { value: "MONTHLY", label: "Mensual" },
             { value: "ANNUAL", label: "Anual" },
-            { value: "PERPETUAL", label: "Pago único" },
           ]}
         />
       </div>
@@ -280,7 +284,7 @@ export function PlanCatalog({
           <h3 className="font-serif text-xl text-[var(--navy)]">POS completo = software + equipos</h3>
           <p className="mt-2 max-w-3xl text-sm text-[var(--steel)]">
             Mostramos los precios del plan de software. Los kits se cotizan por separado con precios reales del catálogo;
-            no inventamos un precio “paquete” si no existe en el backend.
+            no inventamos un precio de paquete si no existe en la oferta comercial.
           </p>
           {kits.length > 0 ? (
             <ul className="mt-4 grid gap-3 sm:grid-cols-3">
@@ -304,41 +308,47 @@ export function PlanCatalog({
         </div>
       ) : null}
 
-      {showRecurring ? (
-        <div className="mt-10">
-          <h2 className="font-serif text-3xl text-[var(--navy)]">Planes {interval === "ANNUAL" ? "anuales" : "mensuales"}</h2>
-          <p className="mt-2 text-[var(--muted)]">Esencial, Profesional y Empresarial — una licencia equivale a una caja.</p>
-          <div className="mt-6 grid gap-5 lg:grid-cols-3">
-            {recurringPriced.map((plan) => (
-              <CommercialPlanCard
-                key={plan.id}
-                plan={plan}
-                interval={interval}
-                solutionMode={solutionMode}
-              />
-            ))}
-          </div>
-          {recurringPriced.length === 0 ? (
-            <p className="mt-6 text-[var(--muted)]">No hay planes recurrentes visibles para esta modalidad.</p>
-          ) : null}
+      <div className="mt-10">
+        <h2 className="font-serif text-3xl text-[var(--navy)]">
+          Planes {interval === "ANNUAL" ? "anuales" : "mensuales"}
+        </h2>
+        <p className="mt-2 text-[var(--muted)]">
+          Esencial, Profesional y Empresarial — una licencia equivale a una caja.
+        </p>
+        <div className="mt-6 grid gap-5 lg:grid-cols-3">
+          {recurring.map((plan) => (
+            <CommercialPlanCard
+              key={plan.id}
+              plan={plan}
+              interval={interval}
+              solutionMode={solutionMode}
+            />
+          ))}
         </div>
-      ) : null}
+        {recurring.length === 0 ? (
+          <p className="mt-6 text-[var(--muted)]">No hay planes recurrentes visibles para esta modalidad.</p>
+        ) : null}
+      </div>
 
-      {showPerpetual && perpetual ? (
-        <div className="mt-10">
+      {perpetual ? (
+        <div className="mt-14 border-t border-[var(--border)] pt-10">
           <h2 className="font-serif text-3xl text-[var(--navy)]">Licencia perpetua</h2>
-          <p className="mt-2 text-[var(--muted)]">Pago único, presentado aparte de los planes mensuales y anuales.</p>
+          <p className="mt-2 text-[var(--muted)]">
+            Pago único, presentado aparte de los planes mensuales y anuales.
+          </p>
           <div className="mt-6 max-w-xl">
             <CommercialPlanCard plan={perpetual} interval="PERPETUAL" solutionMode={solutionMode} />
           </div>
         </div>
       ) : null}
 
-      {showPerpetual && !perpetual ? (
-        <p className="mt-10 text-[var(--muted)]">La oferta de pago único aún no está publicada.</p>
-      ) : null}
-
-      <ComparisonTable plans={comparisonPlans} />
+      <div className="mt-14">
+        <h2 className="font-serif text-2xl text-[var(--navy)]">Compara lo que incluye cada plan</h2>
+        <p className="mt-2 text-sm text-[var(--muted)]">
+          Lenguaje comercial: Disponible, En certificación, Próximamente o No incluido.
+        </p>
+        <ComparisonTable plans={recurring} />
+      </div>
     </div>
   );
 }

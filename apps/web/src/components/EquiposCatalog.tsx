@@ -50,7 +50,7 @@ export function EquiposCatalog({ items }: { items: Equipment[] }) {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrar por categoría">
         {categories.map((cat) => (
           <button
             key={cat}
@@ -68,7 +68,7 @@ export function EquiposCatalog({ items }: { items: Equipment[] }) {
       </div>
 
       <p className="text-sm text-[var(--muted)]">
-        Comparar (2–3 equipos). Las imágenes son ilustraciones SVG, no fotos de modelos reales.
+        Las imágenes son ilustraciones referenciales, no fotos de modelos reales. Compara hasta 3 equipos.
         {compareIds.length ? ` Seleccionados: ${compareIds.length}` : ""}
       </p>
 
@@ -88,6 +88,10 @@ export function EquiposCatalog({ items }: { items: Equipment[] }) {
           </div>
         ))}
       </div>
+
+      {filtered.length === 0 ? (
+        <p className="text-[var(--muted)]">No hay equipos en esta categoría.</p>
+      ) : null}
 
       {compared.length >= 2 ? (
         <section className="overflow-x-auto border border-[var(--border)] bg-white/80 p-4">
@@ -125,19 +129,11 @@ export function EquiposCatalog({ items }: { items: Equipment[] }) {
                   </td>
                 ))}
               </tr>
-              <tr className="border-b border-[var(--border)]">
+              <tr>
                 <td className="py-2 pr-4 text-[var(--muted)]">Estado</td>
                 {compared.map((item) => (
                   <td key={item.id} className="py-2 pr-4">
                     <StatusBadge status={item.status} />
-                  </td>
-                ))}
-              </tr>
-              <tr>
-                <td className="py-2 pr-4 text-[var(--muted)]">Variant / kit id</td>
-                {compared.map((item) => (
-                  <td key={item.id} className="py-2 pr-4 font-mono text-xs">
-                    {item.productVariantId ?? item.kitId ?? "—"}
                   </td>
                 ))}
               </tr>

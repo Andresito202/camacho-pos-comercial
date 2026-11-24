@@ -2,6 +2,22 @@ import { Inject, Controller, Get, Query } from "@nestjs/common";
 import { CatalogService } from "./catalog.service.js";
 import { AppConfigService } from "../../config/config.service.js";
 
+/** Codes kept out of public plan bullets (architecture / payment internals). */
+const HIDDEN_PUBLIC_FEATURE_CODES = new Set(["sqlite_single_writer", "factus_pay"]);
+
+function sanitizePlanForPublic<T extends { features?: Array<Record<string, unknown>> }>(plan: T) {
+  const features = (plan.features ?? [])
+    .filter((feature) => {
+      const code = typeof feature.code === "string" ? feature.code : "";
+      return !HIDDEN_PUBLIC_FEATURE_CODES.has(code);
+    })
+    .map((feature) => {
+      const { claimNote: _claimNote, ...rest } = feature;
+      return rest;
+    });
+  return { ...plan, features };
+}
+
 @Controller("catalog")
 export class CatalogController {
   constructor(
@@ -16,11 +32,11 @@ export class CatalogController {
   }
 
   @Get("plans")
-  listPlans(@Query("includeDraft") includeDraft?: string) {
-    if (this.allowDraftPreview(includeDraft)) {
-      return this.catalog.listPlans();
-    }
-    return this.catalog.listPublishedPlans();
+  async listPlans(@Query("includeDraft") includeDraft?: string) {
+    const plans = this.allowDraftPreview(includeDraft)
+      ? await this.catalog.listPlans()
+      : await this.catalog.listPublishedPlans();
+    return plans.map((plan) => sanitizePlanForPublic(plan));
   }
 
   @Get("kits")

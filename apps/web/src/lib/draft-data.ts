@@ -172,12 +172,12 @@ export const draftEquipment: Equipment[] = [
     category: "Punto de venta",
     summary: "All-in-one para mostrador con pantalla capacitiva y montaje estable.",
     description:
-      "Composición de referencia para kits de caja. El modelo comercial exacto se confirma en la orden según disponibilidad de proveedor homologado.",
+      "Ilustración referencial para kits de caja. El modelo comercial exacto se confirma en la orden según disponibilidad del proveedor.",
     price: { amountCents: 1890000, currency: "COP" },
     image: "/images/hardware/terminal-tactil.svg",
     status: "disponible",
     featured: true,
-    specs: ["Pantalla 15\"", "SSD", "Windows 11 IoT o equivalente homologado", "Puertos USB/serie para periféricos"],
+    specs: ["Pantalla 15\"", "SSD", "Windows 11 IoT o equivalente", "Puertos USB/serie para periféricos"],
   },
   {
     id: "eq-impresora-termica",
@@ -211,7 +211,7 @@ export const draftEquipment: Equipment[] = [
     category: "Pesaje",
     summary: "Para avícolas, panaderías y mostradores de peso variable.",
     description:
-      "Integración de balanza en certificación sectorial. No se ofrece como disponible comercial hasta cerrar el adapter del kit correspondiente.",
+      "Balanza en certificación sectorial. No se ofrece como disponible comercial hasta cerrar la integración del kit correspondiente.",
     price: { amountCents: 750000, currency: "COP" },
     image: "/images/hardware/balanza.svg",
     status: "en_certificacion",
@@ -290,7 +290,7 @@ export const draftCoverage: CoverageCity[] = [
     slug: "cali",
     name: "Cali",
     department: "Valle del Cauca",
-    summary: "Acompañamiento comercial y envío de kits homologados.",
+    summary: "Acompañamiento comercial y envío de kits confirmados al contratar.",
     leadTimeDays: 5,
     status: "disponible",
   },
@@ -349,6 +349,15 @@ export const draftSolutions: SolutionSector[] = [
     challenges: ["Pesaje", "Etiquetado", "Merma"],
     capabilities: ["Balanza en certificación", "Tickets", "Inventario por peso"],
     image: "/images/sectors/avicolas.svg",
+  },
+  {
+    slug: "salsamentarias",
+    name: "Salsamentarias",
+    headline: "Mostrador rápido con peso y porciones",
+    summary: "Venta por peso o unidad, control de porciones y tickets claros para el cliente del barrio.",
+    challenges: ["Peso variable", "Porciones", "Rotación de producto"],
+    capabilities: ["Caja rápida", "Tickets", "Inventario básico", "Balanza en certificación"],
+    image: "/images/sectors/salsamentarias.svg",
   },
   {
     slug: "panaderias",

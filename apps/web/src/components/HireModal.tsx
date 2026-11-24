@@ -271,10 +271,13 @@ function HireModal({
       intent: "contratar",
       planId: plan.id,
       planSlug: plan.slug,
+      modality,
+      priceLabel,
       city: cities.find((c) => c.id === form.cityCode)?.name,
       note: [
         form.companyName,
         modalityLabel(modality),
+        priceLabel,
         form.solutionType === "COMPLETE" ? "POS completo" : "Solo software",
         `cajas:${form.cajaQty}`,
       ]
