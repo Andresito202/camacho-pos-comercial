@@ -18,6 +18,12 @@ process.env.PUBLIC_SITE_ORIGIN = "https://camachoposcolombia.com";
 describe("commercial-api critical paths", () => {
   let app: import("@nestjs/platform-fastify").NestFastifyApplication;
   let prisma: import("@camacho-pos-comercial/database").PrismaClient;
+  let draftPriceId: string;
+  let draftPriceVersion: number;
+  let publishablePlanId: string;
+  let publishablePriceId: string;
+  let publishablePriceVersion: number;
+  let publishableAmountCents: number;
 
   beforeAll(async () => {
     const { NestFactory } = await import("@nestjs/core");
@@ -27,6 +33,90 @@ describe("commercial-api critical paths", () => {
 
     prisma = new PrismaClient({ datasourceUrl: process.env.DATABASE_URL });
     await prisma.$connect();
+
+    // Self-contained fixtures — CI migrates but does not seed catalog data.
+    const draftPlan = await prisma.plan.upsert({
+      where: { slug: "ci-draft-plan" },
+      create: {
+        slug: "ci-draft-plan",
+        name: "CI Draft Plan",
+        description: "Fixture for DRAFT purchase rejection",
+        publicationStatus: "DRAFT",
+        sortOrder: 900,
+      },
+      update: { publicationStatus: "DRAFT", deletedAt: null },
+    });
+    const draftPrice = await prisma.planPrice.upsert({
+      where: {
+        planId_billingInterval_version: {
+          planId: draftPlan.id,
+          billingInterval: "MONTHLY",
+          version: 1,
+        },
+      },
+      create: {
+        planId: draftPlan.id,
+        billingInterval: "MONTHLY",
+        version: 1,
+        amountCents: 49900,
+        publicationStatus: "DRAFT",
+      },
+      update: { amountCents: 49900, publicationStatus: "DRAFT" },
+    });
+    draftPriceId = draftPrice.id;
+    draftPriceVersion = draftPrice.version;
+
+    const publishablePlan = await prisma.plan.upsert({
+      where: { slug: "ci-publishable-plan" },
+      create: {
+        slug: "ci-publishable-plan",
+        name: "CI Publishable Plan",
+        description: "Fixture for price-tampering checks",
+        publicationStatus: "DRAFT",
+        sortOrder: 901,
+      },
+      update: { deletedAt: null },
+    });
+    const publishablePrice = await prisma.planPrice.upsert({
+      where: {
+        planId_billingInterval_version: {
+          planId: publishablePlan.id,
+          billingInterval: "MONTHLY",
+          version: 1,
+        },
+      },
+      create: {
+        planId: publishablePlan.id,
+        billingInterval: "MONTHLY",
+        version: 1,
+        amountCents: 79900,
+        publicationStatus: "DRAFT",
+      },
+      update: { amountCents: 79900 },
+    });
+    publishablePlanId = publishablePlan.id;
+    publishablePriceId = publishablePrice.id;
+    publishablePriceVersion = publishablePrice.version;
+    publishableAmountCents = publishablePrice.amountCents;
+
+    const expiredEnds = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    await prisma.coupon.upsert({
+      where: { code: "EXPIRED10" },
+      create: {
+        code: "EXPIRED10",
+        type: "PERCENT",
+        percentOff: 10,
+        active: true,
+        endsAt: expiredEnds,
+      },
+      update: {
+        type: "PERCENT",
+        percentOff: 10,
+        active: true,
+        endsAt: expiredEnds,
+        deletedAt: null,
+      },
+    });
 
     app = await NestFactory.create(
       AppModule,
@@ -76,20 +166,15 @@ describe("commercial-api critical paths", () => {
   });
 
   it("rejects draft prices as not purchasable", async () => {
-    const draftPrice = await prisma.planPrice.findFirst({
-      where: { publicationStatus: "DRAFT" },
-    });
-    expect(draftPrice).toBeTruthy();
-
     const cartRes = await inject("POST", "/v1/cart");
     expect([200, 201]).toContain(cartRes.statusCode);
     const cart = cartRes.json();
 
     const addRes = await inject("POST", `/v1/cart/${cart.sessionToken}/items`, {
       payload: {
-        planPriceId: draftPrice!.id,
+        planPriceId: draftPriceId,
         quantity: 1,
-        expectedPriceVersion: draftPrice!.version,
+        expectedPriceVersion: draftPriceVersion,
       },
     });
     expect(addRes.statusCode).toBe(400);
@@ -97,17 +182,12 @@ describe("commercial-api critical paths", () => {
   });
 
   it("rejects price tampering on published prices", async () => {
-    const plan = await prisma.plan.findFirstOrThrow({ where: { slug: "esencial" } });
-    const price = await prisma.planPrice.findFirstOrThrow({
-      where: { planId: plan.id, billingInterval: "MONTHLY" },
-    });
-
     await prisma.plan.update({
-      where: { id: plan.id },
+      where: { id: publishablePlanId },
       data: { publicationStatus: "PUBLISHED" },
     });
     await prisma.planPrice.update({
-      where: { id: price.id },
+      where: { id: publishablePriceId },
       data: { publicationStatus: "PUBLISHED" },
     });
 
@@ -117,21 +197,21 @@ describe("commercial-api critical paths", () => {
 
       const tampered = await inject("POST", `/v1/cart/${cart.sessionToken}/items`, {
         payload: {
-          planPriceId: price.id,
+          planPriceId: publishablePriceId,
           quantity: 1,
-          expectedPriceVersion: price.version,
-          expectedUnitAmountCents: price.amountCents + 1,
+          expectedPriceVersion: publishablePriceVersion,
+          expectedUnitAmountCents: publishableAmountCents + 1,
         },
       });
       expect(tampered.statusCode).toBe(400);
       expect(errorCode(tampered.json())).toBe("PRICE_TAMPERING_REJECTED");
     } finally {
       await prisma.planPrice.update({
-        where: { id: price.id },
+        where: { id: publishablePriceId },
         data: { publicationStatus: "DRAFT" },
       });
       await prisma.plan.update({
-        where: { id: plan.id },
+        where: { id: publishablePlanId },
         data: { publicationStatus: "DRAFT" },
       });
     }
@@ -209,16 +289,51 @@ describe("commercial-api critical paths", () => {
   });
 
   it("lists active promotions filtered by time window", async () => {
+    const futureStart = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    const futureEnd = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+    await prisma.promotion.upsert({
+      where: { code: "FUTURE-SAMPLE" },
+      create: {
+        code: "FUTURE-SAMPLE",
+        name: "Future sample",
+        publicationStatus: "PUBLISHED",
+        startsAt: futureStart,
+        endsAt: futureEnd,
+      },
+      update: {
+        publicationStatus: "PUBLISHED",
+        startsAt: futureStart,
+        endsAt: futureEnd,
+        deletedAt: null,
+      },
+    });
+
+    const activeStart = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const activeEnd = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await prisma.promotion.upsert({
+      where: { code: "CI-ACTIVE" },
+      create: {
+        code: "CI-ACTIVE",
+        name: "CI active promo",
+        publicationStatus: "PUBLISHED",
+        startsAt: activeStart,
+        endsAt: activeEnd,
+      },
+      update: {
+        publicationStatus: "PUBLISHED",
+        startsAt: activeStart,
+        endsAt: activeEnd,
+        deletedAt: null,
+      },
+    });
+
     const res = await inject("GET", "/v1/promotions");
     expect(res.statusCode).toBe(200);
     const body = res.json() as Array<{ code: string; active: boolean }>;
     expect(Array.isArray(body)).toBe(true);
-    // FUTURE-SAMPLE is scheduled ahead and must not appear as active-now
     expect(body.some((p) => p.code === "FUTURE-SAMPLE")).toBe(false);
-    // At least one staging campaign with a current Bogota window should be present after seed
-    if (body.length) {
-      expect(body.every((p) => p.active === true)).toBe(true);
-    }
+    expect(body.some((p) => p.code === "CI-ACTIVE")).toBe(true);
+    expect(body.every((p) => p.active === true)).toBe(true);
   });
 
   it("health check works", async () => {
