@@ -1,7 +1,16 @@
 # Revisión visual integral — guía del propietario
 
-**HEAD de referencia:** `67da254` (CI exact-HEAD SUCCESS).  
+**HEAD de referencia:** `fcff259` (galería Playwright) · producto CI SUCCESS en `67da254`.  
 **Objetivo:** ver y evaluar el portal completo sin fusionar a `main`, sin tocar `pos-platform` y sin cobros reales.
+
+## Galería capturada (Playwright fullPage)
+
+72 PNG escritorio `1920×1080` + móvil `390×844` contra app real + PostgreSQL:
+
+- Índice HTTPS: [docs/testing/visual-review-final/INDEX.md](https://github.com/Andresito202/camacho-pos-comercial/blob/feat/commercial-platform-foundation/docs/testing/visual-review-final/INDEX.md)
+- Raw: https://raw.githubusercontent.com/Andresito202/camacho-pos-comercial/feat/commercial-platform-foundation/docs/testing/visual-review-final/INDEX.md
+
+Superadmin en esas capturas usa fixture de desarrollo; no es producción.
 
 ## 1. Staging protegido — estado honesto
 
