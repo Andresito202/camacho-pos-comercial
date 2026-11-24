@@ -4,12 +4,17 @@ build
 .env
 .env.local
 *.log
-coverage
+# Test coverage reports only — do NOT ignore apps/*/src/modules/coverage
+/coverage
+**/coverage/
+!apps/**/modules/coverage/
+!apps/**/modules/coverage/**
 .turbo
 .DS_Store
 *.tsbuildinfo
 .next
 apps/web/.next
+apps/web/test-results
 apps/commercial-api/dist
 packages/*/dist
 packages/database/prisma/generated

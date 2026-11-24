@@ -11,7 +11,7 @@ const boolFromEnv = z
 export const EnvSchema = z
   .object({
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
-    PORT: z.coerce.number().int().positive().default(3100),
+    PORT: z.coerce.number().int().positive().default(4000),
     DATABASE_URL: z.string().min(1),
 
     CENTRAL_AUTHORITY_ORIGIN: z.string().url().optional().or(z.literal("")),

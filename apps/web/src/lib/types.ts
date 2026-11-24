@@ -13,6 +13,9 @@ export type Plan = {
   description: string;
   priceMonthly: Money;
   priceYearly?: Money;
+  /** Server plan-price id used by POST /v1/cart/:token/items */
+  planPriceId?: string;
+  priceVersion?: number;
   highlights: string[];
   includesHardwareHint?: string;
   status: FeatureStatus;
@@ -31,6 +34,9 @@ export type Equipment = {
   status: FeatureStatus;
   featured?: boolean;
   specs: string[];
+  productVariantId?: string;
+  kitId?: string;
+  priceVersion?: number;
 };
 
 export type Promotion = {
@@ -107,6 +113,11 @@ export type CartItem = {
   name: string;
   quantity: number;
   unitPrice: Money;
+  /** Exact fields commercial-api cart expects (server is price authority). */
+  planPriceId?: string;
+  productVariantId?: string;
+  kitId?: string;
+  priceVersion?: number;
 };
 
 export type Cart = {

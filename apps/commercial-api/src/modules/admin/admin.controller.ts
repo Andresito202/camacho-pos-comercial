@@ -31,6 +31,37 @@ export class AdminController {
     return this.catalog.listKits();
   }
 
+  /** Stub surfaces for web admin nav — GLOBAL gate already applied. */
+  @Get("pedidos")
+  listOrders() {
+    return [];
+  }
+
+  @Get("pagos")
+  listPayments() {
+    return [];
+  }
+
+  @Get("clientes")
+  listCustomers() {
+    return [];
+  }
+
+  @Get("contenidos")
+  listContents() {
+    return [];
+  }
+
+  @Get("promociones")
+  listPromotions() {
+    return [];
+  }
+
+  @Get("ajustes")
+  listSettings() {
+    return [];
+  }
+
   @Patch("catalog/plan-prices/:id")
   async updatePlanPrice(
     @Param("id") id: string,

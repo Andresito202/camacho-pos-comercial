@@ -59,6 +59,21 @@ export class CatalogService {
     });
   }
 
+  /** Admin/debug: includes DRAFT products — never used for purchase paths. */
+  async listProducts(status?: PublicationStatus) {
+    return this.prisma.product.findMany({
+      where: {
+        deletedAt: null,
+        kind: { not: "KIT" },
+        ...(status ? { publicationStatus: status } : {}),
+      },
+      include: {
+        variants: { where: { deletedAt: null }, orderBy: { version: "desc" } },
+      },
+      orderBy: { sortOrder: "asc" },
+    });
+  }
+
   async getPurchasablePlanPrice(planPriceId: string) {
     const price = await this.prisma.planPrice.findUnique({
       where: { id: planPriceId },

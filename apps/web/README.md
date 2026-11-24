@@ -35,7 +35,10 @@ When commercial-api is unreachable, **development** serves labeled DRAFT preview
 | Coverage | `GET /v1/coverage/zones` |
 | WhatsApp | `POST /v1/whatsapp/catalog-message` |
 | Demo / contact | `POST /v1/crm/demo`, `POST /v1/crm/contact` |
-| Checkout / payment status | `POST /v1/checkout`, `GET /v1/payments/:id` |
-| Admin (GLOBAL) | `GET /v1/admin/catalog/plans|kits` (+ stubs for other admin pages) |
+| Cart | `POST /v1/cart`, `POST /v1/cart/:sessionToken/items` |
+| Checkout / payment status | `POST /v1/checkout` (`cartSessionToken` + `idempotencyKey`), `GET /v1/payments/:referenceCode` |
+| Admin (GLOBAL) | `GET /v1/admin/catalog/plans|kits` (+ stubs: pedidos/pagos/clientes/contenidos/promociones/ajustes) |
+
+In non-production, `GET /v1/catalog/plans|products|kits` and `GET /v1/coverage/zones` include DRAFT for preview. Purchase paths still reject unpublished prices.
 
 When commercial-api is unreachable, **development** (and production *build*) may use labeled DRAFT preview. Production *runtime* fails closed without inventing sellable catalog.

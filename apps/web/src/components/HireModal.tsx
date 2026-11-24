@@ -30,12 +30,14 @@ export function HireModalTrigger({ plan }: { plan: Plan }) {
             <Button
               onClick={() => {
                 addCartItem({
-                  id: `plan-${plan.id}`,
+                  id: `plan-${plan.planPriceId ?? plan.id}`,
                   kind: "plan",
-                  refId: plan.id,
+                  refId: plan.planPriceId ?? plan.id,
                   slug: plan.slug,
                   name: plan.name,
                   unitPrice: plan.priceMonthly,
+                  ...(plan.planPriceId ? { planPriceId: plan.planPriceId } : {}),
+                  ...(plan.priceVersion != null ? { priceVersion: plan.priceVersion } : {}),
                 });
                 setOpen(false);
               }}

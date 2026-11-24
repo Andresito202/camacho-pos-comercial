@@ -1,5 +1,6 @@
 import { Inject, Body, Controller, Get, Param, Post } from "@nestjs/common";
 import { ApplyCouponSchema, parseAddCartItem } from "@camacho-pos-comercial/contracts";
+import { parseOrBadRequest } from "../../common/parse-or-bad-request.js";
 import { CartService } from "./cart.service.js";
 
 @Controller("cart")
@@ -18,13 +19,13 @@ export class CartController {
 
   @Post(":sessionToken/items")
   addItem(@Param("sessionToken") sessionToken: string, @Body() body: unknown) {
-    const input = parseAddCartItem(body);
+    const input = parseOrBadRequest(() => parseAddCartItem(body));
     return this.carts.addItem(sessionToken, input);
   }
 
   @Post(":sessionToken/coupon")
   applyCoupon(@Param("sessionToken") sessionToken: string, @Body() body: unknown) {
-    const { code } = ApplyCouponSchema.parse(body);
+    const { code } = parseOrBadRequest(() => ApplyCouponSchema.parse(body));
     return this.carts.applyCoupon(sessionToken, code);
   }
 }

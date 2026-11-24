@@ -47,6 +47,7 @@ type ApiPlan = {
     amountCents: number;
     currencyCode: string;
     publicationStatus: string;
+    version: number;
   }>;
 };
 
@@ -58,7 +59,13 @@ type ApiProduct = {
   description: string;
   kind?: string;
   publicationStatus: string;
-  variants?: Array<{ id: string; name: string; amountCents: number; publicationStatus: string }>;
+  variants?: Array<{
+    id: string;
+    name: string;
+    amountCents: number;
+    publicationStatus: string;
+    version: number;
+  }>;
 };
 
 type ApiKit = {
@@ -69,6 +76,7 @@ type ApiKit = {
   amountCents: number;
   currencyCode?: string;
   publicationStatus: string;
+  priceVersion: number;
 };
 
 type ApiFaq = {
@@ -105,6 +113,29 @@ type ApiZone = {
   rates?: Array<{ minDays?: number | null; maxDays?: number | null }>;
 };
 
+type ApiCart = {
+  id: string;
+  sessionToken: string;
+  status: string;
+  items: unknown[];
+  totals: {
+    currencyCode: string;
+    subtotalCents: number;
+    discountCents: number;
+    shippingCents: number;
+    taxCents: number;
+    totalCents: number;
+  };
+};
+
+type ApiCheckout = {
+  id: string;
+  orderNumber?: string;
+  status: string;
+  totalCents?: number;
+  paymentReference?: string | null;
+};
+
 type ApiInit = RequestInit & { next?: { revalidate?: number | false }; cache?: RequestCache };
 
 async function apiFetch<T>(path: string, init?: ApiInit): Promise<T | null> {
@@ -125,6 +156,35 @@ async function apiFetch<T>(path: string, init?: ApiInit): Promise<T | null> {
     return (await response.json()) as T;
   } catch {
     return null;
+  }
+}
+
+async function apiFetchRaw(
+  path: string,
+  init?: ApiInit,
+): Promise<{ ok: boolean; status: number; body: unknown }> {
+  const url = `${getApiUrl()}${path}`;
+  try {
+    const { cache, next, headers, ...rest } = init ?? {};
+    const response = await fetch(url, {
+      ...rest,
+      cache,
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        ...(headers ?? {}),
+      },
+      next: cache === "no-store" ? undefined : next,
+    } as RequestInit);
+    let body: unknown = null;
+    try {
+      body = await response.json();
+    } catch {
+      body = null;
+    }
+    return { ok: response.ok, status: response.status, body };
+  } catch {
+    return { ok: false, status: 0, body: null };
   }
 }
 
@@ -152,12 +212,27 @@ function mapFeatureStatus(value?: string | null): FeatureStatus {
   }
 }
 
+function pickPrice(
+  prices: NonNullable<ApiPlan["prices"]> | undefined,
+  interval: string,
+): NonNullable<ApiPlan["prices"]>[number] | undefined {
+  if (!prices?.length) return undefined;
+  const publishedInterval = prices.find(
+    (p) => p.billingInterval === interval && p.publicationStatus === "PUBLISHED",
+  );
+  if (publishedInterval) return publishedInterval;
+  if (interval === "MONTHLY") {
+    const anyPublished = prices.find((p) => p.publicationStatus === "PUBLISHED");
+    if (anyPublished) return anyPublished;
+  }
+  const draftInterval = prices.find((p) => p.billingInterval === interval);
+  if (draftInterval) return draftInterval;
+  return prices[0];
+}
+
 function mapPlan(plan: ApiPlan): Plan {
-  const monthly =
-    plan.prices?.find((p) => p.billingInterval === "MONTHLY" && p.publicationStatus === "PUBLISHED") ??
-    plan.prices?.find((p) => p.publicationStatus === "PUBLISHED") ??
-    plan.prices?.[0];
-  const yearly = plan.prices?.find((p) => p.billingInterval === "ANNUAL" && p.publicationStatus === "PUBLISHED");
+  const monthly = pickPrice(plan.prices, "MONTHLY");
+  const yearly = pickPrice(plan.prices, "ANNUAL");
   return {
     id: plan.id,
     slug: plan.slug,
@@ -168,6 +243,9 @@ function mapPlan(plan: ApiPlan): Plan {
       amountCents: monthly?.amountCents ?? 0,
       currency: "COP",
     },
+    ...(monthly
+      ? { planPriceId: monthly.id, priceVersion: monthly.version }
+      : {}),
     highlights: (plan.features ?? []).map((f) => f.label).slice(0, 6),
     status: mapFeatureStatus(plan.publicationStatus),
     featured: plan.publicationStatus === "PUBLISHED",
@@ -190,6 +268,9 @@ function mapProduct(product: ApiProduct): Equipment {
     status: mapFeatureStatus(product.publicationStatus),
     featured: product.publicationStatus === "PUBLISHED",
     specs: (product.variants ?? []).map((v) => v.name),
+    ...(variant
+      ? { productVariantId: variant.id, priceVersion: variant.version }
+      : {}),
   };
 }
 
@@ -206,6 +287,8 @@ function mapKit(kit: ApiKit): Equipment {
     status: mapFeatureStatus(kit.publicationStatus),
     featured: true,
     specs: ["Kit comercial", `slug:${kit.slug}`],
+    kitId: kit.id,
+    priceVersion: kit.priceVersion,
   };
 }
 
@@ -227,6 +310,23 @@ function mapZone(zone: ApiZone): CoverageCity {
     leadTimeDays: lead,
     status: mapFeatureStatus(zone.publicationStatus ?? "PUBLISHED"),
   };
+}
+
+function mapPaymentStatus(status?: string): CheckoutStatus {
+  switch ((status ?? "").toUpperCase()) {
+    case "PAID":
+    case "PAGADO":
+      return "pagado";
+    case "FAILED":
+    case "REJECTED":
+    case "RECHAZADO":
+      return "rechazado";
+    case "EXPIRED":
+    case "EXPIRADO":
+      return "expirado";
+    default:
+      return "pendiente";
+  }
 }
 
 export async function getSettings(): Promise<FetchResult<SiteSettings>> {
@@ -447,36 +547,99 @@ export async function quoteCart(items: CartItem[]): Promise<FetchResult<Cart>> {
   };
 }
 
+function cartItemToApiPayload(item: CartItem): Record<string, unknown> | null {
+  const quantity = item.quantity;
+  const expectedPriceVersion = item.priceVersion;
+  if (!expectedPriceVersion) return null;
+
+  if (item.planPriceId) {
+    return {
+      planPriceId: item.planPriceId,
+      quantity,
+      expectedPriceVersion,
+      expectedUnitAmountCents: item.unitPrice.amountCents,
+    };
+  }
+  if (item.kitId) {
+    return {
+      kitId: item.kitId,
+      quantity,
+      expectedPriceVersion,
+      expectedUnitAmountCents: item.unitPrice.amountCents,
+    };
+  }
+  if (item.productVariantId) {
+    return {
+      productVariantId: item.productVariantId,
+      quantity,
+      expectedPriceVersion,
+      expectedUnitAmountCents: item.unitPrice.amountCents,
+    };
+  }
+  return null;
+}
+
 export async function createCheckout(input: {
   items: CartItem[];
   customer: Record<string, string>;
 }): Promise<{ id: string; status: CheckoutStatus; source: ApiSource } | null> {
-  const data = await apiFetch<{ id?: string; orderId?: string; status?: string }>("/v1/checkout", {
+  const cartRes = await apiFetchRaw("/v1/cart", { method: "POST", cache: "no-store" });
+  const cart = cartRes.body as ApiCart | null;
+  if (!cartRes.ok || !cart?.sessionToken) {
+    if (!isDevelopment()) return null;
+    return { id: `draft-chk-${Date.now()}`, status: "pendiente", source: "draft" };
+  }
+
+  for (const item of input.items) {
+    const payload = cartItemToApiPayload(item);
+    if (!payload) {
+      if (!isDevelopment()) return null;
+      return { id: `draft-chk-${Date.now()}`, status: "pendiente", source: "draft" };
+    }
+    const addRes = await apiFetchRaw(`/v1/cart/${cart.sessionToken}/items`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+      cache: "no-store",
+    });
+    if (!addRes.ok) {
+      if (!isDevelopment()) return null;
+      return { id: `draft-chk-${Date.now()}`, status: "pendiente", source: "draft" };
+    }
+  }
+
+  const idempotencyKey = `web-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  const checkoutRes = await apiFetchRaw("/v1/checkout", {
     method: "POST",
     body: JSON.stringify({
+      cartSessionToken: cart.sessionToken,
+      idempotencyKey,
       customer: {
-        fullName: input.customer.businessName,
+        fullName: input.customer.businessName || input.customer.fullName || "Cliente",
         email: input.customer.email,
-        phoneE164: input.customer.phone,
+        phoneE164: input.customer.phone || input.customer.phoneE164,
       },
       business: {
-        legalName: input.customer.businessName,
-        taxId: input.customer.nit,
-        city: input.customer.city,
+        legalName: input.customer.businessName || input.customer.fullName || "Cliente",
+        nit: input.customer.nit,
+        cityCode: input.customer.city?.slice(0, 10) || undefined,
+        addressLine: input.customer.notes || undefined,
       },
-      notes: input.customer.notes,
-      items: input.items.map((item) => ({
-        kind: item.kind === "plan" ? "PLAN_PRICE" : "PRODUCT_VARIANT",
-        refId: item.refId,
-        quantity: item.quantity,
-      })),
     }),
     cache: "no-store",
   });
-  if (data?.id || data?.orderId) {
+
+  const data = checkoutRes.body as ApiCheckout | null;
+  if (checkoutRes.ok && data?.paymentReference) {
     return {
-      id: data.id ?? data.orderId!,
-      status: (data.status?.toLowerCase() as CheckoutStatus) || "pendiente",
+      id: data.paymentReference,
+      status: mapPaymentStatus(data.status),
+      source: "api",
+    };
+  }
+  if (checkoutRes.ok && data?.id) {
+    return {
+      id: data.id,
+      status: mapPaymentStatus(data.status),
       source: "api",
     };
   }
@@ -487,13 +650,21 @@ export async function createCheckout(input: {
 export async function getCheckoutStatus(
   id: string,
 ): Promise<FetchResult<{ id: string; status: CheckoutStatus }> | null> {
-  const data = await apiFetch<{ id: string; status: string }>(`/v1/payments/${id}`, {
+  // commercial-api lookup key is payment referenceCode
+  const data = await apiFetch<{
+    referenceCode?: string;
+    id?: string;
+    status: string;
+  }>(`/v1/payments/${encodeURIComponent(id)}`, {
     cache: "no-store",
   });
   if (data) {
     return {
       source: "api",
-      data: { id: data.id, status: (data.status?.toLowerCase() as CheckoutStatus) || "pendiente" },
+      data: {
+        id: data.referenceCode ?? data.id ?? id,
+        status: mapPaymentStatus(data.status),
+      },
     };
   }
   if (isDevelopment() && id.startsWith("draft-")) {
