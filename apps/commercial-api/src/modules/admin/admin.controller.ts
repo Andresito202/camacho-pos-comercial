@@ -1,5 +1,6 @@
 import {
   Inject,
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -8,6 +9,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   Req,
   UseGuards,
@@ -155,12 +157,56 @@ const StockSchema = z
   })
   .strict();
 
+const KitItemInputSchema = z
+  .object({
+    productVariantId: z.string().min(1),
+    quantity: z.number().int().positive(),
+  })
+  .strict();
+
+const KitCreateSchema = z
+  .object({
+    slug: z.string().min(1),
+    sku: z.string().min(1),
+    name: z.string().min(1),
+    description: z.string().min(1),
+    amountCents: MoneyCentsSchema,
+    publicationStatus: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]).optional(),
+    imageUrl: z.string().optional(),
+    imageAlt: z.string().optional(),
+    items: z.array(KitItemInputSchema).min(1),
+  })
+  .strict();
+
+const KitItemsReplaceSchema = z
+  .object({
+    items: z.array(KitItemInputSchema).min(1),
+  })
+  .strict();
+
 const KitPatchSchema = z
   .object({
     name: z.string().min(1).optional(),
     description: z.string().min(1).optional(),
     amountCents: MoneyCentsSchema.optional(),
     publicationStatus: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]).optional(),
+  })
+  .strict();
+
+const OrderActionSchema = z
+  .object({
+    action: z.enum([
+      "PREPARE_SHIPMENT",
+      "MARK_READY",
+      "SHIP",
+      "DELIVER",
+      "CANCEL",
+      "MARK_RETURN_RECEIVED",
+      "MANUAL_REFUND_MARK",
+    ]),
+    carrier: z.string().min(1).optional(),
+    trackingCode: z.string().min(1).optional(),
+    reason: z.string().max(2000).optional(),
   })
   .strict();
 
@@ -411,6 +457,28 @@ export class AdminController {
     return this.catalog.listKits();
   }
 
+  @Post("catalog/kits")
+  async createKit(
+    @Body() body: unknown,
+    @Req() req: { commercialSession?: BridgedSession },
+  ) {
+    const input = KitCreateSchema.parse(body);
+    const created = await this.catalog.createKit({ ...input, adminId: this.actor(req) });
+    await this.audit.record({
+      actorType: "ADMIN",
+      actorId: this.actor(req),
+      action: "KIT_CREATED",
+      entityType: "Kit",
+      entityId: created.id,
+      metadata: {
+        slug: input.slug,
+        amountCents: input.amountCents,
+        itemCount: input.items.length,
+      },
+    });
+    return created;
+  }
+
   @Patch("catalog/kits/:id")
   async patchKit(
     @Param("id") id: string,
@@ -426,6 +494,25 @@ export class AdminController {
       entityType: "Kit",
       entityId: id,
       metadata: input,
+    });
+    return updated;
+  }
+
+  @Put("catalog/kits/:id/items")
+  async replaceKitItems(
+    @Param("id") id: string,
+    @Body() body: unknown,
+    @Req() req: { commercialSession?: BridgedSession },
+  ) {
+    const input = KitItemsReplaceSchema.parse(body);
+    const updated = await this.catalog.replaceKitItems(id, input.items);
+    await this.audit.record({
+      actorType: "ADMIN",
+      actorId: this.actor(req),
+      action: "KIT_ITEMS_REPLACED",
+      entityType: "Kit",
+      entityId: id,
+      metadata: { itemCount: input.items.length },
     });
     return updated;
   }
@@ -583,11 +670,189 @@ export class AdminController {
       include: {
         customer: { select: { id: true, fullName: true, email: true } },
         items: true,
-        payments: { select: { id: true, status: true, amountCents: true, referenceCode: true } },
+        payments: {
+          select: {
+            id: true,
+            status: true,
+            amountCents: true,
+            referenceCode: true,
+            provider: true,
+            environment: true,
+          },
+        },
+        shipments: true,
+        provisioning: { select: { id: true, status: true, lastError: true } },
       },
       orderBy: { createdAt: "desc" },
       take: 200,
     });
+  }
+
+  @Patch("pedidos/:id")
+  async applyOrderAction(
+    @Param("id") id: string,
+    @Body() body: unknown,
+    @Req() req: { commercialSession?: BridgedSession },
+  ) {
+    const input = OrderActionSchema.parse(body);
+    const order = await this.prisma.order.findFirst({
+      where: { id, deletedAt: null },
+      include: {
+        payments: true,
+        shipments: { orderBy: { createdAt: "desc" } },
+        items: true,
+      },
+    });
+    if (!order) throw new NotFoundException({ code: "ORDER_NOT_FOUND" });
+
+    const actorId = this.actor(req);
+    const latestShipment = order.shipments[0] ?? null;
+    const hasHardware = order.items.some(
+      (item) => Boolean(item.productId) || Boolean(item.productVariantId) || Boolean(item.kitId),
+    );
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      switch (input.action) {
+        case "PREPARE_SHIPMENT":
+        case "MARK_READY": {
+          if (!["PAID", "PROVISIONING", "FULFILLED"].includes(order.status)) {
+            throw new BadRequestException({ code: "ORDER_NOT_READY_FOR_SHIPMENT" });
+          }
+          if (!hasHardware) {
+            throw new BadRequestException({ code: "ORDER_HAS_NO_HARDWARE_LINES" });
+          }
+          if (latestShipment && !["PENDING", "READY", "CANCELLED"].includes(latestShipment.status)) {
+            throw new BadRequestException({ code: "SHIPMENT_ALREADY_IN_TRANSIT" });
+          }
+          const shipment =
+            latestShipment && latestShipment.status !== "CANCELLED"
+              ? await tx.shipment.update({
+                  where: { id: latestShipment.id },
+                  data: {
+                    status: "READY",
+                    ...(input.carrier ? { carrier: input.carrier } : {}),
+                    ...(input.trackingCode ? { trackingCode: input.trackingCode } : {}),
+                  },
+                })
+              : await tx.shipment.create({
+                  data: {
+                    orderId: order.id,
+                    status: "READY",
+                    carrier: input.carrier ?? null,
+                    trackingCode: input.trackingCode ?? null,
+                    amountCents: order.shippingCents,
+                  },
+                });
+          return { order, shipment };
+        }
+        case "SHIP": {
+          if (!latestShipment || !["PENDING", "READY"].includes(latestShipment.status)) {
+            throw new BadRequestException({ code: "SHIPMENT_NOT_READY" });
+          }
+          if (!input.trackingCode && !latestShipment.trackingCode) {
+            throw new BadRequestException({ code: "TRACKING_CODE_REQUIRED" });
+          }
+          const shipment = await tx.shipment.update({
+            where: { id: latestShipment.id },
+            data: {
+              status: "SHIPPED",
+              shippedAt: new Date(),
+              ...(input.carrier ? { carrier: input.carrier } : {}),
+              ...(input.trackingCode ? { trackingCode: input.trackingCode } : {}),
+            },
+          });
+          return { order, shipment };
+        }
+        case "DELIVER": {
+          if (!latestShipment || latestShipment.status !== "SHIPPED") {
+            throw new BadRequestException({ code: "SHIPMENT_NOT_SHIPPED" });
+          }
+          const shipment = await tx.shipment.update({
+            where: { id: latestShipment.id },
+            data: { status: "DELIVERED", deliveredAt: new Date() },
+          });
+          const updatedOrder = await tx.order.update({
+            where: { id: order.id },
+            data: { status: "FULFILLED" },
+          });
+          return { order: updatedOrder, shipment };
+        }
+        case "CANCEL": {
+          if (!["PENDING_PAYMENT", "PAID", "PROVISIONING"].includes(order.status)) {
+            throw new BadRequestException({ code: "ORDER_NOT_CANCELLABLE" });
+          }
+          if (latestShipment && ["SHIPPED", "DELIVERED"].includes(latestShipment.status)) {
+            throw new BadRequestException({ code: "SHIPPED_ORDER_NOT_CANCELLABLE" });
+          }
+          if (latestShipment && latestShipment.status !== "CANCELLED") {
+            await tx.shipment.update({
+              where: { id: latestShipment.id },
+              data: { status: "CANCELLED" },
+            });
+          }
+          const updatedOrder = await tx.order.update({
+            where: { id: order.id },
+            data: { status: "CANCELLED" },
+          });
+          return { order: updatedOrder, shipment: latestShipment };
+        }
+        case "MARK_RETURN_RECEIVED": {
+          if (!latestShipment || latestShipment.status !== "DELIVERED") {
+            throw new BadRequestException({ code: "RETURN_REQUIRES_DELIVERED_SHIPMENT" });
+          }
+          // Local logistics only — does not move money at Factus.
+          const shipment = await tx.shipment.update({
+            where: { id: latestShipment.id },
+            data: {
+              status: "CANCELLED",
+              trackingCode: latestShipment.trackingCode
+                ? `${latestShipment.trackingCode}|RETURN:${input.reason ?? "received"}`
+                : `RETURN:${input.reason ?? "received"}`,
+            },
+          });
+          return { order, shipment, note: "RETURN_RECEIVED_LOCAL_ONLY" };
+        }
+        case "MANUAL_REFUND_MARK": {
+          const paid = order.payments.find((p) => p.status === "PAID") ?? order.payments[0];
+          if (!paid) throw new BadRequestException({ code: "PAYMENT_NOT_FOUND" });
+          if (paid.provider === "FACTUS_PAY") {
+            throw new BadRequestException({
+              code: "FACTUS_REFUND_UNSUPPORTED",
+              message:
+                "Factus Pay no expone reembolso automatizado en este portal. No se simula cobro inverso.",
+            });
+          }
+          if (!["MANUAL", "SANDBOX_MOCK"].includes(paid.provider)) {
+            throw new BadRequestException({ code: "REFUND_PROVIDER_NOT_MANUAL" });
+          }
+          await tx.payment.update({
+            where: { id: paid.id },
+            data: { status: "REFUNDED" },
+          });
+          const updatedOrder = await tx.order.update({
+            where: { id: order.id },
+            data: { status: "REFUNDED" },
+          });
+          return { order: updatedOrder, paymentId: paid.id };
+        }
+        default:
+          throw new BadRequestException({ code: "UNKNOWN_ORDER_ACTION" });
+      }
+    });
+
+    await this.audit.record({
+      actorType: "ADMIN",
+      actorId,
+      action: `ORDER_${input.action}`,
+      entityType: "Order",
+      entityId: id,
+      metadata: {
+        action: input.action,
+        reason: input.reason ?? null,
+        trackingCode: input.trackingCode ?? null,
+      },
+    });
+    return result;
   }
 
   @Get("pagos")

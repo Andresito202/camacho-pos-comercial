@@ -262,4 +262,206 @@ describe("admin test fixture (non-production only)", () => {
     await prisma.faq.delete({ where: { id: faqBody.id } });
     await prisma.blogPost.delete({ where: { id: blogBody.id } });
   });
+
+  it("creates kit with components and reflects PUBLISHED kit on public catalog", async () => {
+    const server = app.getHttpAdapter().getInstance();
+    const suffix = Date.now();
+    const component = await prisma.product.create({
+      data: {
+        slug: `ci-kit-part-${suffix}`,
+        sku: `CI-KIT-PART-${suffix}`,
+        name: "CI Kit Part",
+        description: "Componente de kit CI",
+        kind: "HARDWARE",
+        publicationStatus: "PUBLISHED",
+        variants: {
+          create: {
+            sku: `CI-KIT-PART-V-${suffix}`,
+            name: "Estándar",
+            amountCents: 120000,
+            publicationStatus: "PUBLISHED",
+            stock: { create: { quantityOnHand: 7, trackInventory: true } },
+          },
+        },
+      },
+      include: { variants: true },
+    });
+    const variantId = component.variants[0]!.id;
+
+    const create = await server.inject({
+      method: "POST",
+      url: "/v1/admin/catalog/kits",
+      headers: { ...FIXTURE_HEADERS, "content-type": "application/json" },
+      payload: {
+        slug: `ci-kit-${suffix}`,
+        sku: `CI-KIT-${suffix}`,
+        name: "CI Kit Completo",
+        description: "Kit de prueba CI",
+        amountCents: 450000,
+        publicationStatus: "PUBLISHED",
+        items: [{ productVariantId: variantId, quantity: 2 }],
+      },
+    });
+    expect([200, 201]).toContain(create.statusCode);
+    const kit = create.json() as { id: string; items: Array<{ quantity: number }> };
+    expect(kit.items[0]?.quantity).toBe(2);
+
+    const replace = await server.inject({
+      method: "PUT",
+      url: `/v1/admin/catalog/kits/${kit.id}/items`,
+      headers: { ...FIXTURE_HEADERS, "content-type": "application/json" },
+      payload: { items: [{ productVariantId: variantId, quantity: 3 }] },
+    });
+    expect(replace.statusCode).toBe(200);
+    const replaced = replace.json() as { items: Array<{ quantity: number }> };
+    expect(replaced.items[0]?.quantity).toBe(3);
+
+    const publicKits = await server.inject({ method: "GET", url: "/v1/catalog/kits?includeDraft=0" });
+    expect(publicKits.statusCode).toBe(200);
+    const listed = publicKits.json() as Array<{ id: string; name: string; amountCents: number }>;
+    const found = listed.find((row) => row.id === kit.id);
+    expect(found?.name).toBe("CI Kit Completo");
+    expect(found?.amountCents).toBe(450000);
+
+    await prisma.kitItem.deleteMany({ where: { kitId: kit.id } });
+    await prisma.kitPriceHistory.deleteMany({ where: { kitId: kit.id } });
+    await prisma.kit.delete({ where: { id: kit.id } });
+    await prisma.productStock.deleteMany({ where: { productVariantId: variantId } });
+    await prisma.productVariant.delete({ where: { id: variantId } });
+    await prisma.product.delete({ where: { id: component.id } });
+    const kitProduct = await prisma.product.findFirst({ where: { slug: `ci-kit-${suffix}` } });
+    if (kitProduct) {
+      await prisma.productImage.deleteMany({ where: { productId: kitProduct.id } });
+      await prisma.product.delete({ where: { id: kitProduct.id } });
+    }
+  });
+
+  it("order ship/deliver/cancel and Factus refund refusal", async () => {
+    const server = app.getHttpAdapter().getInstance();
+    const suffix = Date.now();
+    const customer = await prisma.commercialCustomer.create({
+      data: {
+        email: `ci-order-${suffix}@example.com`,
+        fullName: "CI Order Customer",
+      },
+    });
+    const order = await prisma.order.create({
+      data: {
+        orderNumber: `CI-ORD-${suffix}`,
+        customerId: customer.id,
+        status: "PAID",
+        currencyCode: "COP",
+        subtotalCents: 100000,
+        shippingCents: 10000,
+        totalCents: 110000,
+        idempotencyKey: `ci-order-${suffix}`,
+        paidAt: new Date(),
+        items: {
+          create: {
+            quantity: 1,
+            unitAmountCents: 100000,
+            lineTotalCents: 100000,
+            priceVersion: 1,
+            label: "Terminal CI",
+            productId: null,
+          },
+        },
+        payments: {
+          create: {
+            customerId: customer.id,
+            provider: "FACTUS_PAY",
+            environment: "SANDBOX",
+            status: "PAID",
+            amountCents: 110000,
+            referenceCode: `ci-ref-${suffix}`,
+          },
+        },
+      },
+      include: { items: true },
+    });
+    // Attach a real product line for hardware shipment path
+    const hw = await prisma.product.create({
+      data: {
+        slug: `ci-hw-ship-${suffix}`,
+        sku: `CI-HW-${suffix}`,
+        name: "CI HW Ship",
+        description: "Hardware para envío CI",
+        kind: "HARDWARE",
+        publicationStatus: "PUBLISHED",
+      },
+    });
+    await prisma.orderItem.update({
+      where: { id: order.items[0]!.id },
+      data: { productId: hw.id },
+    });
+
+    const ready = await server.inject({
+      method: "PATCH",
+      url: `/v1/admin/pedidos/${order.id}`,
+      headers: { ...FIXTURE_HEADERS, "content-type": "application/json" },
+      payload: { action: "MARK_READY", carrier: "Servientrega" },
+    });
+    expect(ready.statusCode).toBe(200);
+
+    const ship = await server.inject({
+      method: "PATCH",
+      url: `/v1/admin/pedidos/${order.id}`,
+      headers: { ...FIXTURE_HEADERS, "content-type": "application/json" },
+      payload: { action: "SHIP", carrier: "Servientrega", trackingCode: `TRK-${suffix}` },
+    });
+    expect(ship.statusCode).toBe(200);
+
+    const deliver = await server.inject({
+      method: "PATCH",
+      url: `/v1/admin/pedidos/${order.id}`,
+      headers: { ...FIXTURE_HEADERS, "content-type": "application/json" },
+      payload: { action: "DELIVER" },
+    });
+    expect(deliver.statusCode).toBe(200);
+    const deliveredOrder = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
+    expect(deliveredOrder.status).toBe("FULFILLED");
+
+    const factusRefund = await server.inject({
+      method: "PATCH",
+      url: `/v1/admin/pedidos/${order.id}`,
+      headers: { ...FIXTURE_HEADERS, "content-type": "application/json" },
+      payload: { action: "MANUAL_REFUND_MARK", reason: "should fail" },
+    });
+    expect(factusRefund.statusCode).toBe(400);
+    const err = factusRefund.json() as { message?: { code?: string } | string; code?: string };
+    const code =
+      typeof err.message === "object" && err.message ? err.message.code : err.code;
+    expect(code).toBe("FACTUS_REFUND_UNSUPPORTED");
+
+    // Cancel path on a fresh pending order
+    const pending = await prisma.order.create({
+      data: {
+        orderNumber: `CI-CAN-${suffix}`,
+        customerId: customer.id,
+        status: "PENDING_PAYMENT",
+        currencyCode: "COP",
+        subtotalCents: 50000,
+        totalCents: 50000,
+        idempotencyKey: `ci-cancel-${suffix}`,
+      },
+    });
+    const cancel = await server.inject({
+      method: "PATCH",
+      url: `/v1/admin/pedidos/${pending.id}`,
+      headers: { ...FIXTURE_HEADERS, "content-type": "application/json" },
+      payload: { action: "CANCEL", reason: "cliente desistió" },
+    });
+    expect(cancel.statusCode).toBe(200);
+    const cancelled = await prisma.order.findUniqueOrThrow({ where: { id: pending.id } });
+    expect(cancelled.status).toBe("CANCELLED");
+
+    await prisma.shipment.deleteMany({ where: { orderId: order.id } });
+    await prisma.paymentEvent.deleteMany({ where: { payment: { orderId: order.id } } });
+    await prisma.paymentAttempt.deleteMany({ where: { payment: { orderId: order.id } } });
+    await prisma.payment.deleteMany({ where: { orderId: order.id } });
+    await prisma.orderItem.deleteMany({ where: { orderId: { in: [order.id, pending.id] } } });
+    await prisma.order.deleteMany({ where: { id: { in: [order.id, pending.id] } } });
+    await prisma.product.delete({ where: { id: hw.id } });
+    await prisma.commercialCustomer.delete({ where: { id: customer.id } });
+  });
 });

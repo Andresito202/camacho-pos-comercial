@@ -8,7 +8,7 @@ import { adminMutate } from "@/lib/api";
 type Field = {
   name: string;
   label: string;
-  type?: "text" | "number" | "textarea" | "checkbox" | "select" | "datetime-local";
+  type?: "text" | "number" | "textarea" | "checkbox" | "select" | "datetime-local" | "json";
   defaultValue?: string | number | boolean;
   options?: Array<{ value: string; label: string }>;
   required?: boolean;
@@ -72,7 +72,7 @@ export function AdminActionForm({
 }: {
   title: string;
   path: string;
-  method?: "POST" | "PATCH" | "DELETE";
+  method?: "POST" | "PATCH" | "PUT" | "DELETE";
   fields?: Field[];
   token?: string;
   submitLabel?: string;
@@ -102,6 +102,14 @@ export function AdminActionForm({
         value = Number(raw);
       } else if (field.type === "datetime-local") {
         value = bogotaLocalToIso(String(raw));
+      } else if (field.type === "json") {
+        try {
+          value = JSON.parse(String(raw));
+        } catch {
+          setPending(false);
+          setMessage(`JSON inválido en ${field.label}`);
+          return;
+        }
       } else {
         value = String(raw);
       }
@@ -129,13 +137,13 @@ export function AdminActionForm({
       {(fields ?? []).map((field) => (
         <label key={field.name} className="block text-sm">
           <span className="mb-1 block text-[var(--muted)]">{field.label}</span>
-          {field.type === "textarea" ? (
+          {field.type === "textarea" || field.type === "json" ? (
             <textarea
               name={field.name}
               defaultValue={typeof field.defaultValue === "string" ? field.defaultValue : ""}
               required={field.required}
-              className="w-full border border-[var(--border)] bg-white px-3 py-2"
-              rows={4}
+              className="w-full border border-[var(--border)] bg-white px-3 py-2 font-mono text-sm"
+              rows={field.type === "json" ? 6 : 4}
             />
           ) : field.type === "checkbox" ? (
             <input

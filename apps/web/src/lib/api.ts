@@ -941,7 +941,7 @@ export async function adminFetch<T>(path: string, token?: string): Promise<T | n
 /** Browser-side admin mutations (fixture header only when NEXT_PUBLIC_ALLOW_ADMIN_TEST_FIXTURE=1). */
 export async function adminMutate<T>(
   path: string,
-  init: { method: "POST" | "PATCH" | "DELETE"; body?: unknown; token?: string },
+  init: { method: "POST" | "PATCH" | "PUT" | "DELETE"; body?: unknown; token?: string },
 ): Promise<{ ok: boolean; status: number; data: T | null; error?: string }> {
   const res = await apiFetchRaw(path, {
     method: init.method,

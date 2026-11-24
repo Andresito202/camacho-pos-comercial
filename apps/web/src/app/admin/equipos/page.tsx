@@ -33,6 +33,19 @@ type KitRow = {
   amountCents: number;
   publicationStatus: string;
   description: string;
+  items?: Array<{
+    id: string;
+    quantity: number;
+    productVariantId: string;
+    variant?: {
+      id: string;
+      sku: string;
+      name: string;
+      amountCents: number;
+      stock?: { quantityOnHand: number } | null;
+      product?: { name: string; sku: string };
+    };
+  }>;
 };
 
 type StockRow = {
@@ -50,10 +63,27 @@ export default async function AdminEquiposPage() {
     adminFetch<StockRow[]>("/v1/admin/catalog/inventory", token),
   ]);
 
+  const variantOptions = (products ?? [])
+    .flatMap((product) =>
+      (product.variants ?? []).map((variant) => ({
+        id: variant.id,
+        label: `${product.name} / ${variant.name} (${variant.id.slice(0, 8)}…) stock=${variant.stock?.quantityOnHand ?? 0}`,
+      })),
+    );
+
+  const defaultItemsJson =
+    variantOptions.length > 0
+      ? JSON.stringify(
+          [{ productVariantId: variantOptions[0]!.id, quantity: 1 }],
+          null,
+          2,
+        )
+      : '[\n  { "productVariantId": "VARIANT_ID", "quantity": 1 }\n]';
+
   return (
     <div>
       <h1 className="font-serif text-3xl">Productos, kits e inventario</h1>
-      <p className="mt-2 text-[var(--muted)]">CRUD mínimo con escrituras Prisma reales.</p>
+      <p className="mt-2 text-[var(--muted)]">CRUD con escrituras Prisma reales (componentes, stock y precios).</p>
 
       <AdminSection title="Crear producto">
         <AdminActionForm
@@ -76,7 +106,6 @@ export default async function AdminEquiposPage() {
                 { value: "HARDWARE", label: "HARDWARE" },
                 { value: "ACCESSORY", label: "ACCESSORY" },
                 { value: "SERVICE", label: "SERVICE" },
-                { value: "KIT", label: "KIT" },
               ],
             },
             {
@@ -106,6 +135,62 @@ export default async function AdminEquiposPage() {
             },
           ]}
         />
+      </AdminSection>
+
+      <AdminSection title="Crear kit POS">
+        {variantOptions.length === 0 ? (
+          <AdminEmptyState
+            title="Sin variantes disponibles"
+            detail="Crea al menos un producto con variante antes de armar un kit."
+          />
+        ) : (
+          <AdminActionForm
+            title="Nuevo kit con componentes"
+            path="/v1/admin/catalog/kits"
+            method="POST"
+            token={token}
+            submitLabel="Crear kit"
+            fields={[
+              { name: "slug", label: "Slug", required: true },
+              { name: "sku", label: "SKU producto kit", required: true },
+              { name: "name", label: "Nombre", required: true },
+              { name: "description", label: "Descripción", type: "textarea", required: true },
+              {
+                name: "amountCents",
+                label: "Precio kit (COP enteros)",
+                type: "number",
+                required: true,
+                defaultValue: 0,
+              },
+              {
+                name: "imageUrl",
+                label: "URL imagen",
+                defaultValue: "/images/hardware/terminal-tactil.svg",
+              },
+              {
+                name: "publicationStatus",
+                label: "Publicación",
+                type: "select",
+                defaultValue: "DRAFT",
+                options: [
+                  { value: "DRAFT", label: "DRAFT" },
+                  { value: "PUBLISHED", label: "PUBLISHED" },
+                ],
+              },
+              {
+                name: "items",
+                label: "Componentes (JSON)",
+                type: "json",
+                required: true,
+                defaultValue: defaultItemsJson,
+                hint: `Variantes disponibles: ${variantOptions
+                  .slice(0, 6)
+                  .map((v) => v.label)
+                  .join(" · ")}`,
+              },
+            ]}
+          />
+        )}
       </AdminSection>
 
       <AdminSection title="Productos">
@@ -171,6 +256,7 @@ export default async function AdminEquiposPage() {
               <div className="mt-3 grid gap-3 md:grid-cols-2">
                 {(product.variants ?? []).map((variant) => (
                   <div key={variant.id} className="space-y-2">
+                    <p className="text-xs text-[var(--muted)]">variantId: {variant.id}</p>
                     <AdminActionForm
                       title={`Precio variante ${variant.name} (${formatMoney({ amountCents: variant.amountCents, currency: "COP" })})`}
                       path={`/v1/admin/catalog/variants/${variant.id}/price`}
@@ -210,42 +296,80 @@ export default async function AdminEquiposPage() {
       </AdminSection>
 
       <AdminSection title="Kits">
+        {(kits ?? []).length === 0 ? (
+          <AdminEmptyState title="Sin kits" detail="Crea el primer kit con el formulario de arriba." />
+        ) : null}
         <div className="grid gap-4 lg:grid-cols-2">
-          {(kits ?? []).map((kit) => (
-            <AdminActionForm
-              key={kit.id}
-              title={`${kit.name} — ${formatMoney({ amountCents: kit.amountCents, currency: "COP" })}`}
-              path={`/v1/admin/catalog/kits/${kit.id}`}
-              method="PATCH"
-              token={token}
-              fields={[
-                { name: "name", label: "Nombre", defaultValue: kit.name },
-                {
-                  name: "description",
-                  label: "Descripción",
-                  type: "textarea",
-                  defaultValue: kit.description,
-                },
-                {
-                  name: "amountCents",
-                  label: "Monto COP",
-                  type: "number",
-                  defaultValue: kit.amountCents,
-                },
-                {
-                  name: "publicationStatus",
-                  label: "Publicación",
-                  type: "select",
-                  defaultValue: kit.publicationStatus,
-                  options: [
-                    { value: "DRAFT", label: "DRAFT" },
-                    { value: "PUBLISHED", label: "PUBLISHED" },
-                    { value: "ARCHIVED", label: "ARCHIVED" },
-                  ],
-                },
-              ]}
-            />
-          ))}
+          {(kits ?? []).map((kit) => {
+            const itemsJson = JSON.stringify(
+              (kit.items ?? []).map((item) => ({
+                productVariantId: item.productVariantId,
+                quantity: item.quantity,
+              })),
+              null,
+              2,
+            );
+            return (
+              <div key={kit.id} className="space-y-3 border border-[var(--border)] bg-white/70 p-4">
+                <AdminActionForm
+                  title={`${kit.name} — ${formatMoney({ amountCents: kit.amountCents, currency: "COP" })}`}
+                  path={`/v1/admin/catalog/kits/${kit.id}`}
+                  method="PATCH"
+                  token={token}
+                  fields={[
+                    { name: "name", label: "Nombre", defaultValue: kit.name },
+                    {
+                      name: "description",
+                      label: "Descripción",
+                      type: "textarea",
+                      defaultValue: kit.description,
+                    },
+                    {
+                      name: "amountCents",
+                      label: "Monto COP",
+                      type: "number",
+                      defaultValue: kit.amountCents,
+                    },
+                    {
+                      name: "publicationStatus",
+                      label: "Publicación",
+                      type: "select",
+                      defaultValue: kit.publicationStatus,
+                      options: [
+                        { value: "DRAFT", label: "DRAFT" },
+                        { value: "PUBLISHED", label: "PUBLISHED" },
+                        { value: "ARCHIVED", label: "ARCHIVED" },
+                      ],
+                    },
+                  ]}
+                />
+                <ul className="text-sm text-[var(--muted)]">
+                  {(kit.items ?? []).map((item) => (
+                    <li key={item.id}>
+                      {item.quantity}× {item.variant?.product?.name ?? item.productVariantId} (
+                      {item.variant?.sku}) · stock {item.variant?.stock?.quantityOnHand ?? "—"}
+                    </li>
+                  ))}
+                </ul>
+                <AdminActionForm
+                  title="Reemplazar componentes del kit"
+                  path={`/v1/admin/catalog/kits/${kit.id}/items`}
+                  method="PUT"
+                  token={token}
+                  submitLabel="Guardar componentes"
+                  fields={[
+                    {
+                      name: "items",
+                      label: "Componentes (JSON)",
+                      type: "json",
+                      required: true,
+                      defaultValue: itemsJson || defaultItemsJson,
+                    },
+                  ]}
+                />
+              </div>
+            );
+          })}
         </div>
       </AdminSection>
 

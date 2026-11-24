@@ -10,13 +10,13 @@ Estados permitidos (sin % arbitrarios): **IMPLEMENTADO** | **PROBADO** | **PARCI
 |---|---|---|
 | Planes / precios | **PROBADO** | Admin PATCH plan + plan-prices; fixture test restore amount |
 | Productos / imágenes / inventario | **PROBADO** | CRUD productos + image URL + variante + stock en `/admin/equipos` |
-| Kits | **PARCIAL** | Edición de kits existentes; sin compositor de kit-create |
+| Kits | **PROBADO** | POST create + PUT items (componentes/qty) + PATCH precio/publicación; stock vía variantes; test admin-fixture |
 | CRM clientes | **PROBADO** | List/filter + PATCH status contact/lead/demo + lead activities → Postgres |
 | Promociones / cupones | **PROBADO** | CRUD + ventana America/Bogota; coupon expired gate |
-| WhatsApp / banners / SEO / social | **PROBADO** | `/admin/contenidos` → PATCH ajustes + social + SEO upsert |
+| WhatsApp / banners / SEO / social | **PROBADO** | `/admin/contenidos` → PATCH ajustes + social + SEO upsert; E2E `catalog-message` |
 | FAQ / Blog create | **PROBADO** | POST create + PATCH edit; tests admin-fixture |
-| Pedidos / pagos | **PARCIAL** | Listas + filtro estado; sin refund/fulfillment actions |
-| Login Central GLOBAL | **BLOQUEADO** | Fixture no-prod o bridge; sin sesión GLOBAL live en este entorno |
+| Pedidos / envíos | **PROBADO** | READY/SHIP/DELIVER/CANCEL/RETURN local; `FACTUS_REFUND_UNSUPPORTED` sin simular Factus |
+| Login Central GLOBAL | **BLOQUEADO** | Ver `docs/commercial/owner-unlock-blockers.md` |
 
 ## Módulos Block D
 

@@ -45,6 +45,27 @@ export class CatalogService {
         deletedAt: null,
         ...(status ? { publicationStatus: status } : {}),
       },
+      include: {
+        product: {
+          select: {
+            id: true,
+            sku: true,
+            slug: true,
+            publicationStatus: true,
+            images: { orderBy: { sortOrder: "asc" }, take: 3 },
+          },
+        },
+        items: {
+          include: {
+            variant: {
+              include: {
+                stock: true,
+                product: { select: { id: true, name: true, sku: true, slug: true } },
+              },
+            },
+          },
+        },
+      },
       orderBy: { name: "asc" },
     });
   }
@@ -428,6 +449,110 @@ export class CatalogService {
     });
   }
 
+  async createKit(input: {
+    slug: string;
+    sku: string;
+    name: string;
+    description: string;
+    amountCents: number;
+    publicationStatus?: PublicationStatus;
+    imageUrl?: string;
+    imageAlt?: string;
+    adminId?: string;
+    items: Array<{ productVariantId: string; quantity: number }>;
+  }) {
+    if (!input.items.length) {
+      throw new BadRequestException({ code: "KIT_ITEMS_REQUIRED" });
+    }
+    const variantIds = input.items.map((item) => item.productVariantId);
+    if (new Set(variantIds).size !== variantIds.length) {
+      throw new BadRequestException({ code: "KIT_ITEMS_DUPLICATE_VARIANT" });
+    }
+    const variants = await this.prisma.productVariant.findMany({
+      where: { id: { in: variantIds }, deletedAt: null },
+      include: { stock: true, product: { select: { id: true, kind: true, name: true } } },
+    });
+    if (variants.length !== variantIds.length) {
+      throw new BadRequestException({ code: "KIT_ITEM_VARIANT_NOT_FOUND" });
+    }
+    for (const variant of variants) {
+      if (variant.product.kind === "KIT") {
+        throw new BadRequestException({ code: "KIT_CANNOT_NEST_KIT" });
+      }
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const product = await tx.product.create({
+        data: {
+          slug: input.slug,
+          sku: input.sku,
+          name: input.name,
+          description: input.description,
+          kind: "KIT",
+          publicationStatus: input.publicationStatus ?? "DRAFT",
+          sortOrder: 0,
+          ...(input.imageUrl
+            ? {
+                images: {
+                  create: {
+                    url: input.imageUrl,
+                    alt: input.imageAlt ?? input.name,
+                    sortOrder: 0,
+                  },
+                },
+              }
+            : {}),
+        },
+      });
+      const kit = await tx.kit.create({
+        data: {
+          productId: product.id,
+          slug: input.slug,
+          name: input.name,
+          description: input.description,
+          amountCents: input.amountCents,
+          priceVersion: 1,
+          publicationStatus: input.publicationStatus ?? "DRAFT",
+          items: {
+            create: input.items.map((item) => ({
+              productVariantId: item.productVariantId,
+              quantity: item.quantity,
+            })),
+          },
+          history: {
+            create: {
+              amountCents: input.amountCents,
+              changedBy: input.adminId ?? "admin",
+              reason: "admin-kit-create",
+            },
+          },
+        },
+        include: {
+          product: {
+            select: {
+              id: true,
+              sku: true,
+              slug: true,
+              publicationStatus: true,
+              images: true,
+            },
+          },
+          items: {
+            include: {
+              variant: {
+                include: {
+                  stock: true,
+                  product: { select: { id: true, name: true, sku: true, slug: true } },
+                },
+              },
+            },
+          },
+        },
+      });
+      return kit;
+    });
+  }
+
   async updateKit(
     kitId: string,
     input: {
@@ -453,7 +578,31 @@ export class CatalogService {
             ? { publicationStatus: input.publicationStatus }
             : {}),
         },
+        include: {
+          items: {
+            include: {
+              variant: {
+                include: {
+                  stock: true,
+                  product: { select: { id: true, name: true, sku: true } },
+                },
+              },
+            },
+          },
+        },
       });
+      if (input.name != null || input.description != null || input.publicationStatus != null) {
+        await tx.product.update({
+          where: { id: kit.productId },
+          data: {
+            ...(input.name != null ? { name: input.name } : {}),
+            ...(input.description != null ? { description: input.description } : {}),
+            ...(input.publicationStatus != null
+              ? { publicationStatus: input.publicationStatus }
+              : {}),
+          },
+        });
+      }
       if (input.amountCents != null) {
         await tx.kitPriceHistory.create({
           data: {
@@ -465,6 +614,58 @@ export class CatalogService {
         });
       }
       return updated;
+    });
+  }
+
+  async replaceKitItems(
+    kitId: string,
+    items: Array<{ productVariantId: string; quantity: number }>,
+  ) {
+    if (!items.length) {
+      throw new BadRequestException({ code: "KIT_ITEMS_REQUIRED" });
+    }
+    const kit = await this.prisma.kit.findFirst({ where: { id: kitId, deletedAt: null } });
+    if (!kit) throw new NotFoundException({ code: "KIT_NOT_FOUND" });
+    const variantIds = items.map((item) => item.productVariantId);
+    if (new Set(variantIds).size !== variantIds.length) {
+      throw new BadRequestException({ code: "KIT_ITEMS_DUPLICATE_VARIANT" });
+    }
+    const variants = await this.prisma.productVariant.findMany({
+      where: { id: { in: variantIds }, deletedAt: null },
+      include: { product: { select: { kind: true } } },
+    });
+    if (variants.length !== variantIds.length) {
+      throw new BadRequestException({ code: "KIT_ITEM_VARIANT_NOT_FOUND" });
+    }
+    for (const variant of variants) {
+      if (variant.product.kind === "KIT") {
+        throw new BadRequestException({ code: "KIT_CANNOT_NEST_KIT" });
+      }
+    }
+    return this.prisma.$transaction(async (tx) => {
+      await tx.kitItem.deleteMany({ where: { kitId } });
+      await tx.kitItem.createMany({
+        data: items.map((item) => ({
+          kitId,
+          productVariantId: item.productVariantId,
+          quantity: item.quantity,
+        })),
+      });
+      return tx.kit.findUniqueOrThrow({
+        where: { id: kitId },
+        include: {
+          items: {
+            include: {
+              variant: {
+                include: {
+                  stock: true,
+                  product: { select: { id: true, name: true, sku: true, slug: true } },
+                },
+              },
+            },
+          },
+        },
+      });
     });
   }
 
