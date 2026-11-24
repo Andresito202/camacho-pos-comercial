@@ -25,6 +25,7 @@ import { CatalogService } from "../catalog/catalog.service.js";
 import { ContentService } from "../content/content.service.js";
 import { PromotionsService } from "../promotions/promotions.service.js";
 import { SupportService } from "../support/support.service.js";
+import { validatePublicImageUrl } from "../../common/security/file-validation.js";
 
 const LeadStatusFilter = z
   .enum(["NEW", "CONTACTED", "QUALIFIED", "DEMO_SCHEDULED", "WON", "LOST", "ARCHIVED"])
@@ -147,7 +148,13 @@ const ImageSchema = z
     alt: z.string().optional(),
     sortOrder: z.number().int().optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((value, ctx) => {
+    const check = validatePublicImageUrl(value.url);
+    if (!check.ok) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: check.message, path: ["url"] });
+    }
+  });
 
 const StockSchema = z
   .object({
@@ -262,7 +269,15 @@ const SettingsPatchSchema = z
     secondaryColor: z.string().optional(),
     accentColor: z.string().optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((value, ctx) => {
+    if (value.logoUrl) {
+      const check = validatePublicImageUrl(value.logoUrl);
+      if (!check.ok) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: check.message, path: ["logoUrl"] });
+      }
+    }
+  });
 
 const SocialSchema = z
   .object({

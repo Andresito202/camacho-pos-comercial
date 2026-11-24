@@ -73,6 +73,18 @@ export const EnvSchema = z
      * Non-production may rely on honeypot + rate limit alone.
      */
     CAPTCHA_REQUIRED_IN_PRODUCTION: boolFromEnv.default(true),
+
+    /**
+     * Shared secret for Central → commercial trial activation webhook.
+     * Without this secret, activation endpoint fails closed (no local simulation).
+     */
+    CENTRAL_TRIAL_WEBHOOK_KEY: z.string().optional().default(""),
+
+    /**
+     * When true, rate limits use Postgres RateLimitCounter (durable across instances).
+     * Default true. Memory fallback only when explicitly disabled for local unit tests.
+     */
+    RATE_LIMIT_DURABLE: boolFromEnv.default(true),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === "production") {

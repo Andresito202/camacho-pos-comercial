@@ -20,6 +20,21 @@ async function bootstrap() {
   });
   app.setGlobalPrefix("v1", { exclude: ["health"] });
 
+  const fastify = app.getHttpAdapter().getInstance();
+  fastify.addHook("onSend", async (_req, reply, payload) => {
+    reply.header("X-Content-Type-Options", "nosniff");
+    reply.header("X-Frame-Options", "DENY");
+    reply.header("Referrer-Policy", "strict-origin-when-cross-origin");
+    reply.header("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+    reply.header("Cross-Origin-Resource-Policy", "same-site");
+    if (env.NODE_ENV === "production") {
+      reply.header("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+    }
+    // API responses are JSON — CSP for API is restrictive; browser CSP is set on Next.
+    reply.header("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'");
+    return payload;
+  });
+
   await app.listen(env.PORT, "0.0.0.0");
   // eslint-disable-next-line no-console
   console.log(`commercial-api listening on :${env.PORT} (${env.NODE_ENV})`);

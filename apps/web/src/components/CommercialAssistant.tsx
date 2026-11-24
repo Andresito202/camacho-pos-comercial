@@ -17,7 +17,7 @@ const APPROVED_FALLBACK: Faq[] = [
     id: "prueba",
     question: "¿Qué es la prueba de 5 días?",
     answer:
-      "Es un registro comercial CRM de evaluación por 5 días con condiciones visibles. Al vencer se bloquea el acceso de prueba y se invita a contratar. La activación de licencia POS en Windows/Android depende del aprovisionamiento Central en pos-platform.",
+      "Solicitas la prueba en el portal; queda en PENDING_ACTIVATION. El reloj de 5 días inicia solo cuando Central confirma la licencia POS. Al vencer se marca bloqueo y se invita a contratar.",
   },
   {
     id: "cobertura",
@@ -33,6 +33,12 @@ const APPROVED_FALLBACK: Faq[] = [
   },
 ];
 
+const PRIVATE_PATTERNS =
+  /\b(token|password|contrase[nñ]a|api[_-]?key|secret|bearer|cookie|session|nit\b|cedula|cédula|pedido\s*#|order\s*id|accessToken|webhook|database|sql|admin\s*password)\b/i;
+
+const INJECTION_PATTERNS =
+  /(ignore (previous|all) instructions|system prompt|act as|jailbreak|dan mode|revela (el|los) (prompt|sistema)|exfiltrat)/i;
+
 function normalize(text: string) {
   return text
     .toLowerCase()
@@ -41,7 +47,7 @@ function normalize(text: string) {
 }
 
 function matchApproved(query: string, knowledge: Faq[]): Faq | null {
-  const q = normalize(query);
+  const q = normalize(query.slice(0, 400));
   if (q.length < 3) return null;
   const tokens = q.split(/\s+/).filter((t) => t.length > 2);
   let best: { item: Faq; score: number } | null = null;
@@ -54,7 +60,8 @@ function matchApproved(query: string, knowledge: Faq[]): Faq | null {
     if (normalize(item.question).includes(q)) score += 3;
     if (!best || score > best.score) best = { item, score };
   }
-  if (!best || best.score < 1) return null;
+  // Require stronger match to avoid weak/hallucinated adjacency.
+  if (!best || best.score < 2) return null;
   return best.item;
 }
 
@@ -70,7 +77,7 @@ export function CommercialAssistant({
   const [messages, setMessages] = useState<Array<{ role: "user" | "assistant"; text: string }>>([
     {
       role: "assistant",
-      text: "Soy el asistente comercial de Camacho POS Colombia. Solo respondo con información aprobada del portal (planes, equipos, cobertura, FAQ y prueba de 5 días). Si no está documentado, te indico contactar a un asesor.",
+      text: "Soy el asistente comercial de Camacho POS Colombia. Solo respondo con textos aprobados del portal (FAQ, planes, equipos, cobertura, prueba 5 días). No invento precios, no leo pedidos ajenos y no revelo datos privados.",
     },
   ]);
 
@@ -84,13 +91,22 @@ export function CommercialAssistant({
     : "/contacto";
 
   function send() {
-    const text = input.trim();
+    const text = input.trim().slice(0, 400);
     if (!text) return;
     setInput("");
-    const hit = matchApproved(text, knowledge);
-    const reply = hit
-      ? hit.answer
-      : "No tengo una respuesta aprobada para esa consulta en el portal. Puedes revisar Preguntas frecuentes, Planes, Equipos o Cobertura, o escribir a un asesor por WhatsApp/Contacto. No invento precios ni promesas.";
+
+    let reply: string;
+    if (PRIVATE_PATTERNS.test(text) || INJECTION_PATTERNS.test(text)) {
+      reply =
+        "No puedo ayudar con secretos, credenciales, datos de otros clientes ni instrucciones que intenten manipularme. Usa Contacto o WhatsApp para un asesor humano.";
+    } else {
+      const hit = matchApproved(text, knowledge);
+      // Return approved answer verbatim — never concatenate user input into the answer.
+      reply = hit
+        ? hit.answer
+        : "No tengo una respuesta aprobada para esa consulta. Revisa Planes, Equipos, Cobertura o Preguntas frecuentes, o escribe a un asesor. No invento información.";
+    }
+
     setMessages((prev) => [...prev, { role: "user", text }, { role: "assistant", text: reply }]);
   }
 
@@ -143,9 +159,10 @@ export function CommercialAssistant({
               <input
                 className="min-w-0 flex-1 rounded-md border border-[var(--border)] px-3 py-2 text-sm"
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
+                onChange={(e) => setInput(e.target.value.slice(0, 400))}
                 placeholder="Pregunta sobre planes, equipos…"
                 aria-label="Pregunta al asistente comercial"
+                maxLength={400}
               />
               <Button type="submit" size="sm">
                 Enviar
@@ -154,12 +171,7 @@ export function CommercialAssistant({
           </div>
         </div>
       ) : null}
-      <Button
-        type="button"
-        className="shadow-[var(--shadow-soft)]"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-      >
+      <Button type="button" className="shadow-[var(--shadow-soft)]" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
         {open ? "Ocultar asesor" : "Asesor comercial"}
       </Button>
     </div>

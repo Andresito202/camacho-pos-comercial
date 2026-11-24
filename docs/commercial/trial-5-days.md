@@ -1,41 +1,42 @@
 # Prueba 5 días — contrato comercial y límites
 
-## Qué está implementado en este portal
+## Ciclo de vida (normativo)
+
+| Estado | Significado |
+|---|---|
+| `PENDING_ACTIVATION` | Formulario CRM recibido. **El reloj NO corre.** |
+| `ACTIVE` | Central confirmó licencia POS (`activationSource=CENTRAL_LICENSE_CONFIRMED`). Reloj 5 días. |
+| `EXPIRED` / `BLOCKED` | Vencimiento durable en Postgres; CTA contratar. Revocación en caja = contrato Central. |
+
+## Qué está implementado
 
 | Capacidad | Estado |
 |---|---|
 | Formulario `/prueba-5-dias` | Implementado |
-| Registro CRM `TrialEnrollment` + Lead | Implementado (`POST /v1/crm/trial`) |
-| Condiciones visibles (consentimiento datos + términos trial) | Implementado |
-| Estado `ACTIVE` con `startsAt` / `expiresAt` (+5 días) | Implementado |
-| Expiración automática al consultar estado | Implementado (`GET /v1/crm/trial/:id`) |
-| Mensaje de bloqueo al vencer + CTA Contratar | Implementado (`/prueba-5-dias/estado/[id]`) |
-| Redirección legacy `/solicitar-demo` → `/prueba-5-dias` | Implementado |
+| Registro `TrialEnrollment` + Lead | `POST /v1/crm/trial` → `PENDING_ACTIVATION` |
+| Anti-repetición por `identityKey` (email\|phone) | Implementado |
+| Token de acceso opaco para estado (anti-enumeración) | Implementado (`?token=`) |
+| Sin PII en respuesta pública de estado | Implementado |
+| Activación solo vía Central webhook | `POST /v1/crm/trial/:id/activate-from-central` + `CENTRAL_TRIAL_WEBHOOK_KEY` (≥32) |
+| Expiración durable | `POST /v1/crm/trial/expire-due` + chequeo en lectura |
+| Condiciones / consentimientos visibles | Implementado |
 
-## Qué NO activa este flujo
+## Qué NO hace este portal
 
-La prueba **no** provisiona una licencia POS live en Windows/Android.
+- **No** inicia el trial al enviar el formulario.
+- **No** simula activaciones locales ni “fixture ACTIVE”.
+- **No** revoca licencia en Windows/Android por sí solo.
 
-### Contrato / integración faltante (pos-platform)
+### Contrato faltante en pos-platform / Central
 
-Para desbloquear caja real hace falta, en **pos-platform / Central**:
+1. Emisión de licencia trial firmada (GLOBAL) y notificación al portal con `centralLicenseRef`.
+2. Webhook autenticado hacia `POST /v1/crm/trial/:id/activate-from-central` con header `X-Central-Trial-Webhook-Key`.
+3. Al expirar/bloquear: revocación/entitlement en Central para que la caja deje de operar (bloqueo efectivo).
 
-1. **Autoridad GLOBAL** vía `CENTRAL_AUTHORITY_ORIGIN` con session bridge habilitado.
-2. Endpoint de aprovisionamiento comercial reachable: `CENTRAL_PROVISIONING_PATH` (default `/v1/commercial/provisioning`) aceptando el outbox de este portal.
-3. Emisión de **licencia comercial firmada** / entitlement de caja (tenant/company/branch derivados del contexto autorizado Central — no IDs inventados por el formulario web).
-4. Evidencia runtime de que el POS Local Service / desktop reconoce esa licencia.
+Hasta entonces `posLicenseProvisioning.activated` es `false` salvo activación Central real.
 
-Hasta que esos contratos existan y se verifiquen, el trial es **CRM comercial** únicamente. El campo `posLicenseProvisioning.activated` permanece `false` y la API documenta el gap en cada respuesta.
+## Seguridad asociada
 
-## Seguridad del formulario
-
-- Honeypot `website`
-- Rate limit 20/min por IP en `/v1/crm/trial`
-- Cloudflare Turnstile o reCAPTCHA cuando hay secretos configurados
-- En producción, captcha obligatorio si `CAPTCHA_REQUIRED_IN_PRODUCTION=true` (default)
-
-## No claims
-
-- No afirma integración live con pos-platform.
-- No afirma cobro ni Factus en la prueba.
-- No afirma instalación automática de Windows/Android.
+- Honeypot, CSRF (Origin + double-submit), captcha, rate limit durable Postgres.
+- Estado sin token → 404 idéntico (no oracle de existencia).
+- Límite: una solicitud abierta (`PENDING_ACTIVATION`|`ACTIVE`) por identidad; máx. 3 en 30 días.

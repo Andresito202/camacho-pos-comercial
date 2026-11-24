@@ -43,7 +43,8 @@ enum LeadStatus {
 }
 
 enum TrialStatus {
-  PENDING
+  /// Form received; clock has NOT started. Waiting for Central license confirmation.
+  PENDING_ACTIVATION
   ACTIVE
   EXPIRED
   CONVERTED
@@ -348,7 +349,7 @@ model DemoRequest {
   @@index([status])
 }
 
-/// Commercial 5-day trial enrollment (CRM). Does NOT activate a POS license in pos-platform by itself.
+/// Commercial 5-day trial enrollment (CRM). Clock starts only after Central confirms POS license.
 model TrialEnrollment {
   id                   String      @id @default(cuid())
   leadId               String?
@@ -360,11 +361,20 @@ model TrialEnrollment {
   sector               String?
   city                 String?
   notes                String?
-  status               TrialStatus @default(ACTIVE)
-  startsAt             DateTime    @default(now())
-  expiresAt            DateTime
+  status               TrialStatus @default(PENDING_ACTIVATION)
+  /// Null until Central confirms activation — form submit must NOT start the clock.
+  startsAt             DateTime?
+  expiresAt            DateTime?
   blockedAt            DateTime?
   blockedReason        String?
+  /// SHA-256 of one-time access token required to read status (anti-enumeration).
+  accessTokenHash      String
+  /// Stable identity key (sha256 email|phone) for anti-repeat / abuse checks.
+  identityKey          String
+  centralLicenseRef    String?
+  activatedAt          DateTime?
+  /// Only CENTRAL_LICENSE_CONFIRMED is accepted — never local simulation.
+  activationSource     String?
   consentDataTreatment Boolean     @default(false)
   consentTerms         Boolean     @default(false)
   sourcePath           String?
@@ -374,8 +384,27 @@ model TrialEnrollment {
 
   customer CommercialCustomer? @relation(fields: [customerId], references: [id])
 
+  @@unique([accessTokenHash])
   @@index([email])
+  @@index([identityKey])
   @@index([status])
+  @@index([expiresAt])
+}
+
+/// Durable shared rate-limit counters (Postgres). Prefer over process-local maps in multi-instance.
+model RateLimitCounter {
+  key     String   @id
+  count   Int      @default(0)
+  resetAt DateTime
+}
+
+/// Captcha token replay protection (Turnstile/reCAPTCHA response hashes).
+model CaptchaTokenUse {
+  tokenHash String   @id
+  provider  String
+  usedAt    DateTime @default(now())
+  expiresAt DateTime
+
   @@index([expiresAt])
 }
 

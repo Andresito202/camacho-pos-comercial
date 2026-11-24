@@ -7,7 +7,12 @@ import { CaptchaField, HoneypotField } from "@/components/FormSecurity";
 import { submitTrialRequest } from "@/lib/api";
 
 export function TrialForm() {
-  const [okId, setOkId] = useState<string | null>(null);
+  const [result, setResult] = useState<{
+    id: string;
+    accessToken?: string;
+    statusPath?: string;
+    status?: string;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | undefined>();
@@ -16,18 +21,27 @@ export function TrialForm() {
 
   const onToken = useCallback((token: string | undefined) => setCaptchaToken(token), []);
 
-  if (okId) {
+  if (result) {
+    const href =
+      result.statusPath ??
+      (result.accessToken
+        ? `/prueba-5-dias/estado/${result.id}?token=${encodeURIComponent(result.accessToken)}`
+        : null);
     return (
       <div className="rounded-[var(--radius)] border border-[var(--teal)]/30 bg-[color-mix(in_srgb,var(--teal)_8%,white)] p-5">
-        <p className="font-bold text-[var(--navy)]">Prueba registrada</p>
+        <p className="font-bold text-[var(--navy)]">Solicitud registrada — pendiente de activación</p>
         <p className="mt-2 text-sm text-[var(--muted)]">
-          Referencia <code className="font-mono text-xs">{okId}</code>. Guarda este enlace para consultar el estado y
-          la fecha de vencimiento.
+          Estado <code className="font-mono text-xs">{result.status ?? "PENDING_ACTIVATION"}</code>. El reloj de 5
+          días <strong>no ha iniciado</strong>: comienza solo cuando Central confirma la licencia POS real. Guarda el
+          enlace de estado (incluye token de acceso de un solo uso en la URL).
         </p>
+        <p className="mt-2 font-mono text-xs text-[var(--muted)]">Ref. {result.id}</p>
         <div className="mt-4 flex flex-wrap gap-3">
-          <Link href={`/prueba-5-dias/estado/${okId}`} className="inline-flex">
-            <Button>Ver estado de la prueba</Button>
-          </Link>
+          {href ? (
+            <Link href={href} className="inline-flex">
+              <Button>Ver estado</Button>
+            </Link>
+          ) : null}
           <Link href="/contratar" className="inline-flex">
             <Button variant="outline">Contratar ahora</Button>
           </Link>
@@ -50,13 +64,18 @@ export function TrialForm() {
         if (captchaToken) payload.captchaToken = captchaToken;
         payload.consentDataTreatment = consentData ? "true" : "false";
         payload.consentTerms = consentTerms ? "true" : "false";
-        const result = await submitTrialRequest(payload);
+        const res = await submitTrialRequest(payload);
         setPending(false);
-        if (!result.ok || !result.id) {
-          setError(result.error ?? "No se pudo registrar la prueba.");
+        if (!res.ok || !res.id) {
+          setError(res.error ?? "No se pudo registrar la prueba.");
           return;
         }
-        setOkId(result.id);
+        setResult({
+          id: res.id,
+          ...(res.accessToken ? { accessToken: res.accessToken } : {}),
+          ...(res.statusPath ? { statusPath: res.statusPath } : {}),
+          ...(res.status ? { status: res.status } : {}),
+        });
       }}
     >
       <HoneypotField />
@@ -80,8 +99,8 @@ export function TrialForm() {
       <label className="flex items-start gap-3 text-sm">
         <input type="checkbox" className="mt-1" checked={consentTerms} onChange={(e) => setConsentTerms(e.target.checked)} />
         <span>
-          Acepto las condiciones de la prueba de 5 días: vencimiento automático, bloqueo al expirar y que la
-          activación de licencia POS en dispositivo depende del aprovisionamiento Central (obligatorio).
+          Acepto que el reloj de 5 días inicia solo con activación real de licencia POS confirmada por Central; al
+          vencer hay bloqueo y CTA de contratación (obligatorio).
         </span>
       </label>
       <CaptchaField onToken={onToken} />
@@ -91,7 +110,7 @@ export function TrialForm() {
         </p>
       ) : null}
       <Button type="submit" disabled={pending || !consentData || !consentTerms}>
-        {pending ? "Registrando…" : "Activar prueba 5 días"}
+        {pending ? "Registrando…" : "Solicitar prueba 5 días"}
       </Button>
     </form>
   );

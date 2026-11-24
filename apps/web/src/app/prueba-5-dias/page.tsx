@@ -22,22 +22,21 @@ export default function Prueba5DiasPage() {
         <div>
           <h2 className="font-bold">Qué incluye</h2>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-[var(--muted)]">
-            <li>Registro CRM con estado ACTIVE</li>
-            <li>Ventana de 5 días calendario</li>
-            <li>Expiración automática al vencer</li>
+            <li>Registro CRM en PENDING_ACTIVATION</li>
+            <li>Reloj de 5 días solo tras confirmación Central</li>
+            <li>Expiración durable y marca de bloqueo al vencer</li>
             <li>CTA para contratar plan publicado</li>
           </ul>
         </div>
         <div>
           <h2 className="font-bold">Condiciones</h2>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-[var(--muted)]">
-            <li>No es cobro real ni pasarela de prueba</li>
-            <li>Un correo = un registro activo a la vez (revisión comercial)</li>
-            <li>Al vencer, el acceso de prueba queda bloqueado</li>
+            <li>No es cobro real ni simulación de licencia</li>
+            <li>Una identidad abierta a la vez (anti-abuso)</li>
+            <li>Estado protegido con token (anti-enumeración)</li>
             <li>
-              La licencia POS en Windows/Android requiere aprovisionamiento Central en{" "}
-              <strong>pos-platform</strong>. Detalle del contrato faltante en{" "}
-              <code className="text-xs">docs/commercial/trial-5-days.md</code>.
+              Licencia POS y bloqueo efectivo en dispositivo dependen de Central /{" "}
+              <strong>pos-platform</strong> — <code className="text-xs">docs/commercial/trial-5-days.md</code>
             </li>
           </ul>
         </div>

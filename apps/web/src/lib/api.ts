@@ -671,9 +671,36 @@ export async function submitDemoRequest(payload: Record<string, string>): Promis
   });
 }
 
+async function withCsrfHeaders(headers: Record<string, string> = {}): Promise<Record<string, string>> {
+  if (typeof window === "undefined") return headers;
+  try {
+    const res = await fetch(`${getApiUrl()}/v1/security/csrf`, {
+      credentials: "include",
+      cache: "no-store",
+    });
+    if (!res.ok) return headers;
+    const data = (await res.json()) as { csrfToken?: string; headerName?: string };
+    if (!data.csrfToken) return headers;
+    return {
+      ...headers,
+      [data.headerName ?? "x-csrf-token"]: data.csrfToken,
+    };
+  } catch {
+    return headers;
+  }
+}
+
 export async function submitTrialRequest(
   payload: Record<string, string>,
-): Promise<{ ok: boolean; id?: string; error?: string; expiresAt?: string }> {
+): Promise<{
+  ok: boolean;
+  id?: string;
+  error?: string;
+  expiresAt?: string | null;
+  accessToken?: string;
+  statusPath?: string;
+  status?: string;
+}> {
   const rawPhone = (payload.phone ?? payload.phoneE164 ?? "").trim();
   const body = {
     fullName: payload.name ?? payload.fullName,
@@ -689,34 +716,60 @@ export async function submitTrialRequest(
     ...(payload.captchaToken ? { captchaToken: payload.captchaToken } : {}),
     ...(payload.website != null ? { website: payload.website } : { website: "" }),
   };
-  const data = await apiFetch<{ id?: string; expiresAt?: string }>("/v1/crm/trial", {
+  const csrfHeaders = await withCsrfHeaders();
+  const data = await apiFetch<{
+    id?: string;
+    expiresAt?: string | null;
+    accessToken?: string;
+    statusPath?: string;
+    status?: string;
+  }>("/v1/crm/trial", {
     method: "POST",
     body: JSON.stringify(body),
     cache: "no-store",
-  });
-  if (data?.id) return { ok: true, id: data.id, ...(data.expiresAt ? { expiresAt: data.expiresAt } : {}) };
-  if (isDevelopment()) return { ok: true, id: `draft-trial-${Date.now()}` };
+    credentials: "include",
+    headers: csrfHeaders,
+  } as ApiInit);
+  if (data?.id) {
+    return {
+      ok: true,
+      id: data.id,
+      status: data.status,
+      expiresAt: data.expiresAt ?? null,
+      ...(data.accessToken ? { accessToken: data.accessToken } : {}),
+      ...(data.statusPath ? { statusPath: data.statusPath } : {}),
+    };
+  }
+  if (isDevelopment()) return { ok: true, id: `draft-trial-${Date.now()}`, status: "PENDING_ACTIVATION" };
   return { ok: false, error: "No se pudo registrar la prueba." };
 }
 
-export async function getTrialStatus(id: string): Promise<{
+export async function getTrialStatus(
+  id: string,
+  accessToken?: string,
+): Promise<{
   id: string;
   status: string;
-  startsAt: string;
-  expiresAt: string;
+  startsAt: string | null;
+  expiresAt: string | null;
   blocked: boolean;
+  pendingActivation?: boolean;
   blockedReason: string | null;
   posLicenseProvisioning?: { activated: boolean; gap: string };
 } | null> {
+  if (!accessToken) return null;
   const data = await apiFetch<{
     id: string;
     status: string;
-    startsAt: string;
-    expiresAt: string;
+    startsAt: string | null;
+    expiresAt: string | null;
     blocked: boolean;
+    pendingActivation?: boolean;
     blockedReason: string | null;
     posLicenseProvisioning?: { activated: boolean; gap: string };
-  }>(`/v1/crm/trial/${encodeURIComponent(id)}`, { cache: "no-store" });
+  }>(`/v1/crm/trial/${encodeURIComponent(id)}?token=${encodeURIComponent(accessToken)}`, {
+    cache: "no-store",
+  });
   return data ?? null;
 }
 
@@ -732,11 +785,14 @@ export async function submitContact(payload: Record<string, string>): Promise<{ 
     ...(payload.captchaToken ? { captchaToken: payload.captchaToken } : {}),
     ...(payload.website != null ? { website: payload.website } : { website: "" }),
   };
+  const csrfHeaders = await withCsrfHeaders();
   const data = await apiFetch<{ id?: string }>("/v1/crm/contact", {
     method: "POST",
     body: JSON.stringify(body),
     cache: "no-store",
-  });
+    credentials: "include",
+    headers: csrfHeaders,
+  } as ApiInit);
   if (data) return { ok: true, ...(data.id ? { id: data.id } : {}) };
   if (isDevelopment()) return { ok: true, id: `draft-contact-${Date.now()}` };
   return { ok: false };
@@ -764,6 +820,7 @@ export type LeadPayload = {
 };
 
 export async function submitLead(payload: LeadPayload): Promise<{ ok: boolean; id?: string; error?: string }> {
+  const csrfHeaders = await withCsrfHeaders();
   const res = await apiFetchRaw("/v1/crm/leads", {
     method: "POST",
     body: JSON.stringify({
@@ -771,7 +828,9 @@ export async function submitLead(payload: LeadPayload): Promise<{ ok: boolean; i
       website: payload.website ?? "",
     }),
     cache: "no-store",
-  });
+    credentials: "include",
+    headers: csrfHeaders,
+  } as ApiInit);
   if (res.ok && res.body && typeof res.body === "object" && "id" in res.body) {
     return { ok: true, id: String((res.body as { id: string }).id) };
   }

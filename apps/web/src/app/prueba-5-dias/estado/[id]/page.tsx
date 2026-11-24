@@ -9,15 +9,24 @@ export const metadata = buildMetadata({
   path: "/prueba-5-dias/estado",
 });
 
-export default async function TrialStatusPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function TrialStatusPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ token?: string }>;
+}) {
   const { id } = await params;
-  const trial = await getTrialStatus(id);
+  const { token } = await searchParams;
+  const trial = token ? await getTrialStatus(id, token) : null;
 
   if (!trial) {
     return (
       <div className="mx-auto max-w-xl px-4 py-16 text-center">
         <h1 className="text-3xl font-bold">Prueba no encontrada</h1>
-        <p className="mt-3 text-[var(--muted)]">Verifica el enlace o registra una nueva prueba.</p>
+        <p className="mt-3 text-[var(--muted)]">
+          El enlace es inválido o el token de acceso no coincide. No se revelan datos de otras solicitudes.
+        </p>
         <Link href="/prueba-5-dias" className="mt-6 inline-flex">
           <Button>Prueba 5 días</Button>
         </Link>
@@ -26,6 +35,7 @@ export default async function TrialStatusPage({ params }: { params: Promise<{ id
   }
 
   const blocked = trial.blocked || trial.status === "EXPIRED" || trial.status === "BLOCKED";
+  const pending = trial.pendingActivation || trial.status === "PENDING_ACTIVATION";
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-12 sm:px-6">
@@ -48,12 +58,23 @@ export default async function TrialStatusPage({ params }: { params: Promise<{ id
             </Link>
           </div>
         </div>
+      ) : pending ? (
+        <div className="mt-6 rounded-[var(--radius)] border border-[var(--yellow)]/50 bg-[color-mix(in_srgb,var(--yellow)_12%,white)] p-5">
+          <p className="font-bold text-[var(--navy)]">Pendiente de activación (Central)</p>
+          <p className="mt-2 text-sm text-[var(--muted)]">
+            {trial.blockedReason ??
+              "El reloj de 5 días aún no corre. Inicia únicamente cuando Central confirme la licencia POS real. Este portal no simula activaciones."}
+          </p>
+        </div>
       ) : (
         <div className="mt-6 rounded-[var(--radius)] border border-[var(--teal)]/30 bg-[color-mix(in_srgb,var(--teal)_8%,white)] p-5">
           <p className="font-bold text-[var(--navy)]">Prueba activa</p>
           <p className="mt-2 text-sm text-[var(--muted)]">
-            Vigente hasta <strong>{new Date(trial.expiresAt).toLocaleString("es-CO")}</strong>. Al vencer, este
-            portal mostrará el bloqueo y el CTA de contratación.
+            Vigente hasta{" "}
+            <strong>
+              {trial.expiresAt ? new Date(trial.expiresAt).toLocaleString("es-CO") : "—"}
+            </strong>
+            . Al vencer, este portal marca bloqueo; la revocación en dispositivo depende de Central.
           </p>
         </div>
       )}
@@ -69,11 +90,11 @@ export default async function TrialStatusPage({ params }: { params: Promise<{ id
         </div>
         <div>
           <dt className="text-[var(--muted)]">Inicio</dt>
-          <dd>{new Date(trial.startsAt).toLocaleString("es-CO")}</dd>
+          <dd>{trial.startsAt ? new Date(trial.startsAt).toLocaleString("es-CO") : "— (pendiente Central)"}</dd>
         </div>
         <div>
           <dt className="text-[var(--muted)]">Vence</dt>
-          <dd>{new Date(trial.expiresAt).toLocaleString("es-CO")}</dd>
+          <dd>{trial.expiresAt ? new Date(trial.expiresAt).toLocaleString("es-CO") : "—"}</dd>
         </div>
         <div className="sm:col-span-2">
           <dt className="text-[var(--muted)]">Licencia POS (pos-platform)</dt>
