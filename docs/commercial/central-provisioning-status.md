@@ -8,10 +8,11 @@ After a **real** Factus webhook marks an order **PAID**, commercial-api enqueues
 
 | Condition | Order status | ProvisioningRequest | Label |
 | --- | --- | --- | --- |
-| Central origin configured | `PROVISIONING` | `QUEUED` → worker may `SENT` | PARCIAL (send path stubbed against unpublished Central route) |
+| Central origin + bridge key; respuesta `QUEUED` | `PROVISIONING` | queda `QUEUED` (no FULFILL) | IMPLEMENTADO — ack de cola ≠ emisión |
+| Central origin + bridge key; `ISSUED` + `licenseIds` | `FULFILLED` | `SENT` | PARCIAL — ruta Central en PR #135; requiere tenant/plan + runtime |
 | Central origin **missing** / unavailable | stays **`PAID`** | stays **`PENDING`** | **PAID + PENDING_PROVISION** — IMPLEMENTADO |
-| Sandbox simulate paid | `PAID` | **no row** / no Central fetch | IMPLEMENTADO (explicit non-provision) |
-| Worker success | `FULFILLED` | `SENT` | BLOQUEADO until Central route exists + credentials |
+| Sandbox simulate paid | `PAID` | **no row** / no Central fetch | IMPLEMENTADO (explicit non-provision; **no** evidencia comercial) |
+| Worker success sin `licenseIds` | no FULFILL | error / reintento | IMPLEMENTADO (fail-closed) |
 
 ## Outbox fields (IMPLEMENTADO)
 
@@ -50,7 +51,7 @@ Defaults:
 
 - `CENTRAL_PROVISIONING_PATH=/v1/commercial/provisioning`
 
-**As of this write-up, pos-platform does not expose `/v1/commercial/provisioning` as a published commercial portal route.** The commercial outbox is ready; Central acceptance remains BLOQUEADO pending product authorization on the POS line.
+**Actualización 2026-11-24:** pos-platform PR #135 publica `POST /v1/commercial/provisioning`. El outbox comercial está listo; la certificación ISSUED+caja sigue **BLOQUEADA** por runtime (Central TLS, tenant/plan, bridge keys, dispositivo), no por ausencia de ruta.
 
 Related Central pieces (pos-platform, consult-only):
 
