@@ -284,8 +284,8 @@ function ctaForPromotion(code: string): { href: string; label: string } {
   if (upper.includes("ANUAL") || upper.includes("ANNUAL")) {
     return { href: "/planes", label: "Ver planes anuales" };
   }
-  if (upper.includes("DEMO") || upper.includes("LANZAMIENTO")) {
-    return { href: "/solicitar-demo", label: "Solicitar demo" };
+  if (upper.includes("DEMO") || upper.includes("TRIAL") || upper.includes("PRUEBA") || upper.includes("LANZAMIENTO")) {
+    return { href: "/prueba-5-dias", label: "Prueba 5 días" };
   }
   return { href: "/promociones", label: "Ver promoción" };
 }

@@ -42,6 +42,15 @@ enum LeadStatus {
   ARCHIVED
 }
 
+enum TrialStatus {
+  PENDING
+  ACTIVE
+  EXPIRED
+  CONVERTED
+  CANCELLED
+  BLOCKED
+}
+
 enum LeadActivityType {
   NOTE
   CALL
@@ -208,6 +217,7 @@ model CommercialCustomer {
   contactRequests  ContactRequest[]
   leads            Lead[]
   demoRequests     DemoRequest[]
+  trialEnrollments TrialEnrollment[]
   carts            Cart[]
   orders           Order[]
   payments         Payment[]
@@ -336,6 +346,37 @@ model DemoRequest {
 
   @@index([email])
   @@index([status])
+}
+
+/// Commercial 5-day trial enrollment (CRM). Does NOT activate a POS license in pos-platform by itself.
+model TrialEnrollment {
+  id                   String      @id @default(cuid())
+  leadId               String?
+  customerId           String?
+  fullName             String
+  email                String
+  phoneE164            String?
+  companyName          String?
+  sector               String?
+  city                 String?
+  notes                String?
+  status               TrialStatus @default(ACTIVE)
+  startsAt             DateTime    @default(now())
+  expiresAt            DateTime
+  blockedAt            DateTime?
+  blockedReason        String?
+  consentDataTreatment Boolean     @default(false)
+  consentTerms         Boolean     @default(false)
+  sourcePath           String?
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+  deletedAt            DateTime?
+
+  customer CommercialCustomer? @relation(fields: [customerId], references: [id])
+
+  @@index([email])
+  @@index([status])
+  @@index([expiresAt])
 }
 
 // ─── Catalog ─────────────────────────────────────────────────────────────────

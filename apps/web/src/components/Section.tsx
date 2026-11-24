@@ -38,7 +38,7 @@ export function Section({
               {eyebrow}
             </p>
           ) : null}
-          <h2 className="font-serif text-3xl leading-tight sm:text-4xl">{title}</h2>
+          <h2 className="text-3xl font-bold leading-tight tracking-tight text-balance sm:text-4xl">{title}</h2>
           {lead ? <p className="mt-4 text-lg text-[color-mix(in_srgb,currentColor_72%,transparent)]">{lead}</p> : null}
         </div>
         {children}

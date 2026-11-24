@@ -21,5 +21,5 @@ export function WhatsAppLauncher({
     setHref(`https://wa.me/${n}?text=${encodeURIComponent(message)}`);
   }, [number, preset]);
 
-  return <WhatsAppFloat href={href} />;
+  return <WhatsAppFloat href={href} label="WhatsApp comercial" />;
 }

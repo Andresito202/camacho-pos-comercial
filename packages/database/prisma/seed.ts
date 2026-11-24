@@ -899,16 +899,22 @@ async function seedContent() {
     },
   });
 
-  await prisma.socialLink.upsert({
-    where: { platform_url: { platform: "whatsapp", url: "https://wa.me/573000000000" } },
-    create: {
-      platform: "whatsapp",
-      url: "https://wa.me/573000000000",
-      sortOrder: 1,
-      publicationStatus: PublicationStatus.DRAFT,
-    },
-    update: { publicationStatus: PublicationStatus.DRAFT },
-  });
+  const socials = [
+    { platform: "facebook", url: "https://www.facebook.com/camachoposcolombia", sortOrder: 1 },
+    { platform: "instagram", url: "https://www.instagram.com/camachoposcolombia", sortOrder: 2 },
+    { platform: "youtube", url: "https://www.youtube.com/@camachoposcolombia", sortOrder: 3 },
+    { platform: "linkedin", url: "https://www.linkedin.com/company/camacho-pos-colombia", sortOrder: 4 },
+  ];
+  for (const social of socials) {
+    await prisma.socialLink.upsert({
+      where: { platform_url: { platform: social.platform, url: social.url } },
+      create: {
+        ...social,
+        publicationStatus: PublicationStatus.PUBLISHED,
+      },
+      update: { publicationStatus: PublicationStatus.PUBLISHED, sortOrder: social.sortOrder },
+    });
+  }
 
   await prisma.faq.upsert({
     where: { slug: "que-incluye-una-licencia" },

@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button, Modal } from "@camacho-pos/ui";
+import { CaptchaField, HoneypotField } from "@/components/FormSecurity";
 import {
   buildWhatsAppMessage,
   getDepartments,
@@ -155,6 +156,8 @@ function HireModal({
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | undefined>();
+  const onCaptchaToken = useCallback((token: string | undefined) => setCaptchaToken(token), []);
 
   useEffect(() => {
     if (!open) return;
@@ -162,6 +165,7 @@ function HireModal({
     setStep(1);
     setMessage(null);
     setError(null);
+    setCaptchaToken(undefined);
     void getDepartments()
       .then((res) => setDepartments(res.data))
       .catch(() => setDepartments([]));
@@ -227,6 +231,8 @@ function HireModal({
       branchQty: form.branchQty,
       consentDataTreatment: form.consentDataTreatment,
       consentCommercial: form.consentCommercial,
+      ...(captchaToken ? { captchaToken } : {}),
+      website: "",
     };
   }
 
@@ -304,17 +310,18 @@ function HireModal({
       open={open}
       onClose={onClose}
       title={`${draftPreview ? "Precio de referencia · " : ""}Contratar ${plan.name}`}
-      className="w-[min(96vw,48rem)]"
+      className="w-[min(96vw,40rem)] sm:w-[min(96vw,48rem)]"
       footer={
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
           {step > 1 ? (
-            <Button variant="outline" size="sm" onClick={() => setStep((s) => Math.max(1, s - 1))}>
+            <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setStep((s) => Math.max(1, s - 1))}>
               Atrás
             </Button>
           ) : null}
           {step < 3 ? (
             <Button
               size="sm"
+              className="w-full sm:w-auto"
               onClick={() => {
                 const err = step === 1 ? validateStep1() : validateStep2();
                 if (err) {
@@ -329,12 +336,18 @@ function HireModal({
             </Button>
           ) : (
             <>
-              <Button size="sm" disabled={submitting || !form.consentDataTreatment} onClick={() => void onContinueCart()}>
-                Continuar
+              <Button
+                size="sm"
+                className="w-full sm:w-auto"
+                disabled={submitting || !form.consentDataTreatment}
+                onClick={() => void onContinueCart()}
+              >
+                Continuar al carrito
               </Button>
               <Button
                 size="sm"
                 variant="secondary"
+                className="w-full sm:w-auto"
                 disabled={submitting || !form.consentDataTreatment}
                 onClick={() => void onRequestAdvice()}
               >
@@ -343,6 +356,7 @@ function HireModal({
               <Button
                 size="sm"
                 variant="outline"
+                className="w-full sm:w-auto"
                 disabled={submitting}
                 onClick={onAddToCart}
                 title={
@@ -355,19 +369,26 @@ function HireModal({
               >
                 Agregar al carrito
               </Button>
-              <Button size="sm" variant="ghost" disabled={submitting} onClick={() => void onWhatsApp()}>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="w-full sm:w-auto"
+                disabled={submitting}
+                onClick={() => void onWhatsApp()}
+              >
                 WhatsApp
               </Button>
             </>
           )}
           {preferWhatsApp && step === 3 ? (
-            <Button size="sm" onClick={() => void onWhatsApp()}>
+            <Button size="sm" className="w-full sm:w-auto" onClick={() => void onWhatsApp()}>
               Abrir WhatsApp
             </Button>
           ) : null}
         </div>
       }
     >
+      <HoneypotField />
       {draftPreview ? (
         <p className="mb-3 rounded-md border border-[var(--yellow)]/40 bg-[color-mix(in_srgb,var(--yellow)_12%,white)] px-3 py-2 text-xs text-[var(--navy)]">
           Precio de referencia pendiente de publicación. El sistema rechaza cobros reales hasta publicar el plan y
@@ -547,6 +568,7 @@ function HireModal({
             />
             <span>Acepto recibir información comercial y novedades de Camacho POS Colombia (opcional).</span>
           </label>
+          <CaptchaField onToken={onCaptchaToken} />
           <p className="text-xs text-[var(--muted)]">
             Resumen: {plan.name} · {modalityLabel(modality)} · {form.solutionType === "COMPLETE" ? "POS completo" : "Solo software"} ·{" "}
             {form.cajaQty} caja(s)

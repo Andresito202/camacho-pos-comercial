@@ -82,35 +82,30 @@ export default async function HomePage() {
               className="mb-8 h-20 w-auto sm:h-24"
               priority
             />
-            <h1 className="max-w-xl font-serif text-4xl leading-[1.08] sm:text-5xl lg:text-[3.35rem]">
+            <h1 className="max-w-xl text-4xl font-bold leading-[1.08] tracking-tight text-balance sm:text-5xl lg:text-[3.2rem]">
               El POS que vende contigo, en el mostrador
             </h1>
             <p className="mt-5 max-w-xl text-lg text-white/90">
               Software y equipos para tiendas, supermercados, droguerías, avícolas, salsamentarias, panaderías y
-              pastelerías. Contrata en línea; tu caja opera en Windows o Android.
+              pastelerías. Contrata en línea o activa una prueba de 5 días; tu caja opera en Windows o Android.
             </p>
-            <div className="mt-8 flex flex-wrap gap-4">
-              <Link href="/planes" className="inline-flex">
-                <Button size="lg">Ver planes</Button>
+            <div className="cta-row mt-8">
+              <Link href="/contratar" className="inline-flex max-w-full">
+                <Button size="lg">Contratar ahora</Button>
               </Link>
-              <Link href="/equipos" className="inline-flex">
-                <Button size="lg" variant="outline" className="border-[var(--ivory)] text-[var(--ivory)] hover:bg-white/10">
-                  Comprar equipos
+              <Link href="/prueba-5-dias" className="inline-flex max-w-full">
+                <Button size="lg" variant="outline" className="border-[var(--yellow)] bg-[var(--yellow)] text-[var(--navy)] hover:brightness-95">
+                  Prueba 5 días
                 </Button>
               </Link>
-              <Link href="/planes?solucion=completo" className="inline-flex">
+              <Link href="/planes" className="inline-flex max-w-full">
+                <Button size="lg" variant="outline" className="border-[var(--ivory)] text-[var(--ivory)] hover:bg-white/10">
+                  Ver planes
+                </Button>
+              </Link>
+              <Link href="/planes?solucion=completo" className="inline-flex max-w-full">
                 <Button size="lg" variant="ghost" className="text-[var(--yellow)] hover:bg-white/10">
                   POS completo
-                </Button>
-              </Link>
-              <Link href="/solicitar-demo" className="inline-flex">
-                <Button size="lg" variant="ghost" className="text-white/85 hover:bg-white/10">
-                  Solicitar demo
-                </Button>
-              </Link>
-              <Link href="/contacto" className="inline-flex">
-                <Button size="lg" variant="ghost" className="text-white/85 hover:bg-white/10">
-                  WhatsApp / asesor
                 </Button>
               </Link>
             </div>
@@ -163,27 +158,27 @@ export default async function HomePage() {
       </section>
 
       <Section
-        eyebrow="Beneficios"
-        title="Operación de mostrador sin drama de conectividad"
-        lead="Vende aunque se interrumpa internet, con roles claros y estados de capacidad transparentes. No vendemos lo que aún no está listo."
+        eyebrow="Beneficios que cierran venta"
+        title="Más tickets, menos fricción en caja"
+        lead="Mensajes comerciales concretos para el dueño del local: continuidad, control y claridad de lo que sí está listo."
       >
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {[
             {
-              title: "Venta aunque falle Internet",
-              body: "Tu caja sigue operando en el local. La fila no se detiene por un corte breve de red.",
+              title: "La fila no se detiene",
+              body: "Si se cae Internet, la caja del local sigue cobrando. Recuperás el ritmo del mostrador sin improvisar cuadernos.",
             },
             {
-              title: "Roles sin confusión",
-              body: "Superadmin comercial no es cajero. Administrador y supervisor tampoco. Cada perfil tiene su destino.",
+              title: "Control por rol, no por caos",
+              body: "Dueño, supervisor y cajero con destinos distintos. El superadmin comercial no opera como cajero.",
             },
             {
-              title: "Estados honestos",
-              body: "Disponible, En certificación, Próximamente o Pendiente de publicación. Sin fingir disponibilidad.",
+              title: "Promesas con estado real",
+              body: "Disponible, En certificación o Próximamente. Comprás lo publicado; no un catálogo decorativo.",
             },
           ].map((item) => (
-            <article key={item.title} className="border-l-4 border-[var(--teal)] pl-4">
-              <h3 className="font-serif text-xl">{item.title}</h3>
+            <article key={item.title} className="surface-card border-l-4 border-[var(--teal)] p-5 pl-4">
+              <h3 className="text-xl font-bold">{item.title}</h3>
               <p className="mt-2 text-[var(--muted)]">{item.body}</p>
             </article>
           ))}
@@ -261,13 +256,13 @@ export default async function HomePage() {
         <ol className="grid gap-4 md:grid-cols-4">
           {[
             "Elige plan y equipos",
-            "Contrata o agenda demo",
+            "Contrata o activa Prueba 5 días",
             "Recibe instalación Windows o Android",
             "Cajero opera en el dispositivo del kit",
           ].map((step, index) => (
-            <li key={step} className="bg-white/70 p-4">
+            <li key={step} className="surface-card p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--teal)]">Paso {index + 1}</p>
-              <p className="mt-2 font-serif text-xl">{step}</p>
+              <p className="mt-2 text-xl font-bold">{step}</p>
             </li>
           ))}
         </ol>
@@ -310,19 +305,27 @@ export default async function HomePage() {
         </div>
       </Section>
 
-      <Section tone="navy" eyebrow="Promociones" title="Ofertas vigentes" lead="Publicadas desde ajustes del sitio. Sin contadores falsos ni urgencia inventada.">
+      <Section
+        tone="navy"
+        eyebrow="Campañas"
+        title="Ofertas que empujan a decidir"
+        lead="Kits de apertura, prueba de 5 días y descuentos nocturnos publicados. Sin contadores falsos."
+      >
         <div className="grid gap-4 md:grid-cols-2">
           {promotions.data.map((promo) => (
-            <article key={promo.id} className="border border-white/15 p-6">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <h3 className="font-serif text-2xl">{promo.title}</h3>
+            <article key={promo.id} className="min-w-0 border border-white/15 bg-white/5 p-6">
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <h3 className="min-w-0 text-2xl font-bold leading-snug">{promo.title}</h3>
                 <StatusBadge status={promo.status} />
               </div>
               <p className="text-white/75">{promo.summary}</p>
               {promo.validUntil ? (
                 <p className="mt-3 text-sm text-white/55">Vigente hasta {promo.validUntil}</p>
               ) : null}
-              <Link href={promo.ctaHref} className="mt-4 inline-block text-[var(--yellow)] underline-offset-2 hover:underline">
+              <Link
+                href={promo.ctaHref}
+                className="mt-4 inline-flex min-h-11 items-center rounded-md bg-[var(--yellow)] px-4 text-sm font-bold text-[var(--navy)] hover:brightness-95"
+              >
                 {promo.ctaLabel}
               </Link>
             </article>
@@ -394,19 +397,19 @@ export default async function HomePage() {
         </div>
       </Section>
 
-      <Section tone="navy" eyebrow="Contacto" title="Hablemos de tu punto de venta" lead="Asesoría comercial, demos y seguimiento de pedidos.">
-        <div className="flex flex-wrap gap-4">
-          <Link href="/contacto" className="inline-flex">
-            <Button size="lg">Contacto</Button>
+      <Section tone="navy" eyebrow="Contacto" title="Hablemos de tu punto de venta" lead="Asesoría comercial, prueba de 5 días y seguimiento de pedidos.">
+        <div className="cta-row">
+          <Link href="/contratar" className="inline-flex max-w-full">
+            <Button size="lg">Contratar ahora</Button>
           </Link>
-          <Link href="/solicitar-demo" className="inline-flex">
-            <Button size="lg" variant="outline" className="border-[var(--ivory)] text-[var(--ivory)]">
-              Solicitar demo
+          <Link href="/prueba-5-dias" className="inline-flex max-w-full">
+            <Button size="lg" variant="outline" className="border-[var(--yellow)] text-[var(--yellow)] hover:bg-white/10">
+              Prueba 5 días
             </Button>
           </Link>
-          <Link href="/contratar" className="inline-flex">
-            <Button size="lg" variant="ghost" className="text-[var(--yellow)]">
-              Contratar ahora
+          <Link href="/contacto" className="inline-flex max-w-full">
+            <Button size="lg" variant="ghost" className="text-[var(--ivory)] hover:bg-white/10">
+              Contacto
             </Button>
           </Link>
         </div>

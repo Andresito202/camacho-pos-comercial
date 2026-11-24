@@ -33,7 +33,7 @@ export default async function CoverageCityPage({ params }: Props) {
       <p className="mt-4 text-sm text-[var(--muted)]">Tiempo orientativo de entrega de hardware: {data.leadTimeDays} días hábiles tras confirmación de pago.</p>
       <div className="mt-8 flex flex-wrap gap-3">
         <Link href={`/contratar?ciudad=${data.slug}`}><Button>Contratar en {data.name}</Button></Link>
-        <Link href="/solicitar-demo"><Button variant="outline">Agendar demo</Button></Link>
+        <Link href="/prueba-5-dias"><Button variant="outline">Prueba 5 días</Button></Link>
       </div>
     </div>
   );

@@ -1,15 +1,19 @@
 :root {
-  --navy: #101c2d;
-  --yellow: #f7c83c;
-  --steel: #25425a;
-  --ivory: #f6f5f0;
-  /* Darkened for ≥4.5:1 on ivory / teal-tint section backgrounds (LH color-contrast). */
-  --teal: #127068;
-  /* Light teal for navy surfaces (≥4.5:1 on #101c2d). */
-  --teal-on-dark: #5ed9cd;
-  --muted: #3f4f5f;
+  /* Commercial brand — cool professional, not cream/AI-template */
+  --navy: #0b1a2c;
+  --yellow: #f0b429;
+  --steel: #1e3a4f;
+  --ivory: #f3f5f8;
+  --surface: #ffffff;
+  --teal: #0d6e66;
+  --teal-on-dark: #6ee7d8;
+  --muted: #445668;
   --white: #ffffff;
   --danger: #b42318;
-  --border: color-mix(in srgb, var(--steel) 18%, transparent);
-  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--yellow) 55%, transparent);
+  --border: color-mix(in srgb, var(--steel) 16%, transparent);
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--yellow) 50%, transparent);
+  --shadow-soft: 0 10px 30px rgba(11, 26, 44, 0.08);
+  --radius: 0.5rem;
+  --font-sans: Arial, "Helvetica Neue", Helvetica, sans-serif;
+  --font-display: Arial, "Helvetica Neue", Helvetica, sans-serif;
 }

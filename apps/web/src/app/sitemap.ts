@@ -11,7 +11,7 @@ const STATIC = [
   "/promociones",
   "/cobertura",
   "/contratar",
-  "/solicitar-demo",
+  "/prueba-5-dias",
   "/contacto",
   "/nosotros",
   "/soporte",

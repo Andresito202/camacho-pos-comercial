@@ -106,14 +106,21 @@ async function captureHireModal(page, viewportKey) {
     }
   };
 
-  await fillByLabel(/nombre/i, "María Camacho Demo");
-  await fillByLabel(/correo|email/i, "maria.demo@ejemplo.com");
-  await fillByLabel(/whatsapp|tel[eé]fono|phone/i, "+573001112233");
-  await fillByLabel(/empresa|negocio|raz[oó]n/i, "Comercial Demo SAS");
-  await fillByLabel(/tipo de negocio|giro/i, "Tienda");
+  await fillByLabel(/nombre completo/i, "María Camacho Demo");
+  await fillByLabel(/correo/i, "maria.demo@ejemplo.com");
+  await fillByLabel(/tel[eé]fono/i, "+573001112233");
+  await safeClick(page, 'button:has-text("Continuar")');
+  await page.waitForTimeout(300);
 
-  // consents
-  const checks = page.locator('input[type="checkbox"]');
+  await fillByLabel(/nombre del negocio|negocio/i, "Comercial Demo SAS");
+  await fillByLabel(/tipo de negocio/i, "Tienda");
+  await fillByLabel(/departamento/i, null);
+  await fillByLabel(/ciudad/i, null);
+  await safeClick(page, 'button:has-text("Continuar")');
+  await page.waitForTimeout(300);
+
+  // consents on step 3
+  const checks = page.locator('dialog input[type="checkbox"], [role="dialog"] input[type="checkbox"]');
   const n = await checks.count();
   for (let i = 0; i < n; i += 1) {
     const box = checks.nth(i);
@@ -123,7 +130,7 @@ async function captureHireModal(page, viewportKey) {
   await page.waitForTimeout(300);
   await shot(page, `modal-contratacion-diligenciado-${vp.label}`);
   await page.keyboard.press("Escape").catch(() => {});
-  await safeClick(page, 'button:has-text("Cerrar")');
+  await safeClick(page, 'button[aria-label="Cerrar"]');
 }
 
 async function captureCartCheckout(page, viewportKey) {
@@ -237,6 +244,7 @@ async function main() {
     ["/equipos", "equipos-catalogo"],
     ["/soluciones", "soluciones"],
     ["/promociones", "promociones"],
+    ["/prueba-5-dias", "prueba-5-dias"],
     ["/cobertura", "cobertura"],
     ["/nosotros", "nosotros"],
     ["/contacto", "contacto"],
@@ -260,9 +268,51 @@ async function main() {
     ["/admin/pagos", "admin-pagos"],
   ];
 
+  // Create a live trial for status/blocked evidence (ACTIVE shot).
+  let trialId = null;
+  try {
+    const res = await fetch(`${process.env.PLAYWRIGHT_API_URL ?? "http://127.0.0.1:4000"}/v1/crm/trial`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        fullName: "Visual Review Trial",
+        email: `visual.trial.${Date.now()}@ejemplo.com`,
+        phoneE164: "+573001112233",
+        companyName: "Revisión Visual SAS",
+        sector: "Tienda",
+        city: "Bogotá",
+        notes: "Captura Playwright",
+        consentDataTreatment: true,
+        consentTerms: true,
+        website: "",
+      }),
+    });
+    const body = await res.json();
+    trialId = body?.id ?? null;
+    console.log(`trialId=${trialId}`);
+  } catch (err) {
+    console.warn("trial create failed", err);
+  }
+
   for (const key of ["desktop", "mobile"]) {
     console.log(`\n=== ${key} ===`);
     await captureStatic(page, key, staticRoutes);
+    if (trialId) {
+      const vp = VIEWPORTS[key];
+      await page.setViewportSize({ width: vp.width, height: vp.height });
+      await page.goto(`${BASE}/prueba-5-dias/estado/${trialId}`, { waitUntil: "networkidle", timeout: 60000 });
+      await page.waitForTimeout(400);
+      await shot(page, `prueba-5-dias-estado-${vp.label}`);
+    }
+    // Open commercial assistant for evidence
+    {
+      const vp = VIEWPORTS[key];
+      await page.setViewportSize({ width: vp.width, height: vp.height });
+      await page.goto(`${BASE}/`, { waitUntil: "networkidle", timeout: 60000 });
+      await safeClick(page, 'button:has-text("Asesor comercial")');
+      await page.waitForTimeout(400);
+      await shot(page, `asistente-comercial-${vp.label}`);
+    }
     await capturePlanesVariants(page, key);
     await captureEquipmentDetail(page, key);
     await captureSolutionDetail(page, key);

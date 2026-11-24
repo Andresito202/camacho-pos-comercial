@@ -635,23 +635,89 @@ export async function buildWhatsAppMessage(input: {
   return { url, message, source: "draft" };
 }
 
-export async function submitDemoRequest(payload: Record<string, string>): Promise<{ ok: boolean; id?: string }> {
+export async function getSocialLinks(): Promise<FetchResult<Array<{ platform: string; url: string }>>> {
+  const data = await apiFetch<Array<{ platform: string; url: string }>>("/v1/content/social");
+  if (data) return { data, source: "api" };
+  return {
+    source: "draft",
+    data: [
+      { platform: "facebook", url: "https://www.facebook.com/camachoposcolombia" },
+      { platform: "instagram", url: "https://www.instagram.com/camachoposcolombia" },
+      { platform: "youtube", url: "https://www.youtube.com/@camachoposcolombia" },
+      { platform: "linkedin", url: "https://www.linkedin.com/company/camacho-pos-colombia" },
+    ],
+  };
+}
+
+export async function getCaptchaConfig(): Promise<{
+  provider: string;
+  siteKey: string | null;
+  required: boolean;
+}> {
+  const data = await apiFetch<{ provider: string; siteKey: string | null; required: boolean }>(
+    "/v1/crm/captcha-config",
+  );
+  if (data) return data;
+  return { provider: "none", siteKey: null, required: false };
+}
+
+export async function submitDemoRequest(payload: Record<string, string>): Promise<{ ok: boolean; id?: string; error?: string }> {
+  return submitTrialRequest({
+    ...payload,
+    fullName: payload.name ?? payload.fullName ?? "",
+    notes: [payload.business, payload.city, payload.goals, payload.notes].filter(Boolean).join(" | "),
+    consentDataTreatment: "true",
+    consentTerms: "true",
+  });
+}
+
+export async function submitTrialRequest(
+  payload: Record<string, string>,
+): Promise<{ ok: boolean; id?: string; error?: string; expiresAt?: string }> {
   const rawPhone = (payload.phone ?? payload.phoneE164 ?? "").trim();
   const body = {
     fullName: payload.name ?? payload.fullName,
     email: payload.email,
     ...(rawPhone ? { phoneE164: rawPhone } : {}),
+    companyName: payload.companyName ?? payload.business,
     sector: payload.sector,
-    notes: [payload.business, payload.city, payload.goals, payload.notes].filter(Boolean).join(" | "),
+    city: payload.city,
+    notes: payload.notes ?? payload.goals,
+    consentDataTreatment: payload.consentDataTreatment === "true" || payload.consentDataTreatment === "1",
+    consentTerms: payload.consentTerms === "true" || payload.consentTerms === "1",
+    sourcePath: "/prueba-5-dias",
+    ...(payload.captchaToken ? { captchaToken: payload.captchaToken } : {}),
+    ...(payload.website != null ? { website: payload.website } : { website: "" }),
   };
-  const data = await apiFetch<{ id?: string }>("/v1/crm/demo", {
+  const data = await apiFetch<{ id?: string; expiresAt?: string }>("/v1/crm/trial", {
     method: "POST",
     body: JSON.stringify(body),
     cache: "no-store",
   });
-  if (data) return { ok: true, ...(data.id ? { id: data.id } : {}) };
-  if (isDevelopment()) return { ok: true, id: `draft-demo-${Date.now()}` };
-  return { ok: false };
+  if (data?.id) return { ok: true, id: data.id, ...(data.expiresAt ? { expiresAt: data.expiresAt } : {}) };
+  if (isDevelopment()) return { ok: true, id: `draft-trial-${Date.now()}` };
+  return { ok: false, error: "No se pudo registrar la prueba." };
+}
+
+export async function getTrialStatus(id: string): Promise<{
+  id: string;
+  status: string;
+  startsAt: string;
+  expiresAt: string;
+  blocked: boolean;
+  blockedReason: string | null;
+  posLicenseProvisioning?: { activated: boolean; gap: string };
+} | null> {
+  const data = await apiFetch<{
+    id: string;
+    status: string;
+    startsAt: string;
+    expiresAt: string;
+    blocked: boolean;
+    blockedReason: string | null;
+    posLicenseProvisioning?: { activated: boolean; gap: string };
+  }>(`/v1/crm/trial/${encodeURIComponent(id)}`, { cache: "no-store" });
+  return data ?? null;
 }
 
 export async function submitContact(payload: Record<string, string>): Promise<{ ok: boolean; id?: string }> {
@@ -663,6 +729,8 @@ export async function submitContact(payload: Record<string, string>): Promise<{ 
     companyName: payload.companyName,
     message: payload.message ?? payload.subject,
     sourcePath: "/contacto",
+    ...(payload.captchaToken ? { captchaToken: payload.captchaToken } : {}),
+    ...(payload.website != null ? { website: payload.website } : { website: "" }),
   };
   const data = await apiFetch<{ id?: string }>("/v1/crm/contact", {
     method: "POST",
@@ -691,12 +759,17 @@ export type LeadPayload = {
   branchQty?: number;
   consentDataTreatment: boolean;
   consentCommercial?: boolean;
+  captchaToken?: string;
+  website?: string;
 };
 
 export async function submitLead(payload: LeadPayload): Promise<{ ok: boolean; id?: string; error?: string }> {
   const res = await apiFetchRaw("/v1/crm/leads", {
     method: "POST",
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      ...payload,
+      website: payload.website ?? "",
+    }),
     cache: "no-store",
   });
   if (res.ok && res.body && typeof res.body === "object" && "id" in res.body) {

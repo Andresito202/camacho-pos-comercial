@@ -3,6 +3,7 @@ import { PrismaModule } from "./common/prisma.module.js";
 import { ConfigModule } from "./config/config.module.js";
 import { AuthModule } from "./common/auth/auth.module.js";
 import { RateLimitModule } from "./common/rate-limit/rate-limit.module.js";
+import { SecurityModule } from "./common/security/security.module.js";
 import { HealthModule } from "./health/health.module.js";
 import { CatalogModule } from "./modules/catalog/catalog.module.js";
 import { CartModule } from "./modules/cart/cart.module.js";
@@ -25,6 +26,7 @@ import { AuditModule } from "./modules/audit/audit.module.js";
     ConfigModule,
     PrismaModule,
     RateLimitModule,
+    SecurityModule,
     AuthModule,
     AuditModule,
     HealthModule,

@@ -61,6 +61,18 @@ export const EnvSchema = z
      * Default: unset / false — fail-closed.
      */
     ALLOW_ADMIN_TEST_FIXTURE: boolFromEnv.default(false),
+
+    /** Cloudflare Turnstile (preferred) — public site key for web + secret for API verify. */
+    TURNSTILE_SITE_KEY: z.string().optional().default(""),
+    TURNSTILE_SECRET_KEY: z.string().optional().default(""),
+    /** Google reCAPTCHA alternative when Turnstile is not configured. */
+    RECAPTCHA_SITE_KEY: z.string().optional().default(""),
+    RECAPTCHA_SECRET_KEY: z.string().optional().default(""),
+    /**
+     * When true (default), production refuses CRM/login public posts if no captcha secret is set.
+     * Non-production may rely on honeypot + rate limit alone.
+     */
+    CAPTCHA_REQUIRED_IN_PRODUCTION: boolFromEnv.default(true),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === "production") {

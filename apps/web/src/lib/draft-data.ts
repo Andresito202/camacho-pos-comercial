@@ -251,20 +251,34 @@ export const draftPromotions: Promotion[] = [
   {
     id: "promo-kit-apertura",
     slug: "kit-apertura",
-    title: "Kit de apertura",
-    summary: "Plan Esencial + terminal + impresora con instalación remota incluida.",
+    title: "Kit de apertura con instalación remota",
+    summary:
+      "Arma tu primer mostrador: plan Esencial + terminal + impresora. Instalación remota incluida al confirmar la orden publicada.",
     validUntil: "2026-12-31",
     ctaHref: "/contratar?plan=esencial",
-    ctaLabel: "Contratar kit",
+    ctaLabel: "Armar kit y contratar",
     status: "disponible",
   },
   {
-    id: "promo-demo-guiada",
-    slug: "demo-guiada",
-    title: "Demo guiada sin compromiso",
-    summary: "Agenda una sesión con un asesor comercial para revisar tu sector y el kit recomendado.",
-    ctaHref: "/solicitar-demo",
-    ctaLabel: "Solicitar demo",
+    id: "promo-prueba-5-dias",
+    slug: "prueba-5-dias",
+    title: "Prueba 5 días para dueños de local",
+    summary:
+      "Evalúa el flujo comercial con registro CRM, condiciones claras y bloqueo automático al vencer. Luego contrata el plan que necesitas.",
+    validUntil: "2026-12-31",
+    ctaHref: "/prueba-5-dias",
+    ctaLabel: "Prueba 5 días",
+    status: "disponible",
+  },
+  {
+    id: "promo-noche-comercio",
+    slug: "noche-comercio",
+    title: "Descuento nocturno en kits publicados",
+    summary:
+      "Fuera de horario pico, priorizamos pedidos de kits completos con lead time confirmado al contratar. Vigencia publicada en /promociones.",
+    validUntil: "2026-12-31",
+    ctaHref: "/promociones",
+    ctaLabel: "Ver campaña nocturna",
     status: "disponible",
   },
 ];

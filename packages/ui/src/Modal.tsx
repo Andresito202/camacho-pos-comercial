@@ -37,7 +37,7 @@ export function Modal({ open, onClose, title, children, className, footer }: Mod
     <dialog
       ref={dialogRef}
       className={cn(
-        "fixed inset-0 z-50 m-auto w-[min(94vw,42rem)] max-h-[min(92vh,52rem)] overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--ivory)] p-0 text-[var(--navy)] shadow-2xl open:flex open:flex-col backdrop:bg-[color-mix(in_srgb,var(--navy)_55%,transparent)]",
+        "fixed left-1/2 top-1/2 z-50 m-0 max-h-[min(92vh,52rem)] w-[min(94vw,42rem)] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-0 text-[var(--navy)] shadow-[var(--shadow-soft)] open:flex open:flex-col backdrop:bg-[color-mix(in_srgb,var(--navy)_60%,transparent)]",
         className,
       )}
       aria-labelledby={titleId}
@@ -46,16 +46,20 @@ export function Modal({ open, onClose, title, children, className, footer }: Mod
         if (event.target === dialogRef.current) onClose();
       }}
     >
-      <div className="flex items-start justify-between gap-4 border-b border-[var(--border)] px-5 py-4">
-        <h2 id={titleId} className="font-serif text-xl font-semibold">
+      <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[var(--border)] px-4 py-3 sm:px-5 sm:py-4">
+        <h2 id={titleId} className="min-w-0 flex-1 text-lg font-bold leading-snug sm:text-xl">
           {title}
         </h2>
-        <Button variant="ghost" size="sm" aria-label="Cerrar" onClick={onClose}>
+        <Button variant="ghost" size="sm" className="shrink-0" aria-label="Cerrar" onClick={onClose}>
           ✕
         </Button>
       </div>
-      <div className="px-5 py-4">{children}</div>
-      {footer ? <div className="border-t border-[var(--border)] px-5 py-4">{footer}</div> : null}
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-5">{children}</div>
+      {footer ? (
+        <div className="shrink-0 border-t border-[var(--border)] bg-[var(--ivory)] px-4 py-3 sm:px-5 sm:py-4">
+          {footer}
+        </div>
+      ) : null}
     </dialog>
   );
 }

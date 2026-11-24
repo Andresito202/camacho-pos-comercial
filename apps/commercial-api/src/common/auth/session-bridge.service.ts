@@ -1,5 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { AppConfigService } from "../../config/config.service.js";
+import { RateLimitService } from "../rate-limit/rate-limit.service.js";
 
 export type CommercialRole = "SUPERADMIN_GLOBAL" | "BUSINESS_ADMIN" | "CUSTOMER" | "ANONYMOUS";
 
@@ -18,9 +19,18 @@ export interface BridgedSession {
  */
 @Injectable()
 export class SessionBridgeService {
-  constructor(@Inject(AppConfigService) private readonly config: AppConfigService) {}
+  constructor(
+    @Inject(AppConfigService) private readonly config: AppConfigService,
+    @Inject(RateLimitService) private readonly rateLimit: RateLimitService,
+  ) {}
 
   async resolve(authorizationHeader: string | undefined): Promise<BridgedSession> {
+    // Harden admin login spray: throttle only when a Bearer token is presented.
+    if (authorizationHeader?.startsWith("Bearer ")) {
+      const throttleKey = `admin-session:${authorizationHeader.slice(0, 32)}`;
+      this.rateLimit.assert(throttleKey, 60, 60_000);
+    }
+
     const origin = this.config.env.CENTRAL_AUTHORITY_ORIGIN?.trim();
     if (!origin) {
       return {

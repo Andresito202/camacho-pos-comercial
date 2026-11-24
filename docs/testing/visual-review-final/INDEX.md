@@ -3,6 +3,7 @@
 **Rama:** `feat/commercial-platform-foundation`  
 **Captura:** Playwright Chromium, `fullPage: true`, app real + PostgreSQL  
 **Viewports:** escritorio `1920×1080` · móvil `390×844`  
+**Actualización:** rediseño comercial, Prueba 5 días, seguridad anti-bot, asistente comercial  
 **Superadmin:** fixture de desarrollo (`NEXT_PUBLIC_ALLOW_ADMIN_TEST_FIXTURE=1`); no es producción.  
 
 Enlaces **HTTPS** a PNG (raw). También disponibles en el árbol del PR.
@@ -14,6 +15,7 @@ Enlaces **HTTPS** a PNG (raw). También disponibles en el árbol del PR.
 | Vista | Escritorio 1920×1080 | Móvil 390×844 |
 |---|---|---|
 | inicio | [PNG](https://raw.githubusercontent.com/Andresito202/camacho-pos-comercial/feat/commercial-platform-foundation/docs/testing/visual-review-final/inicio-1920x1080.png) | [PNG](https://raw.githubusercontent.com/Andresito202/camacho-pos-comercial/feat/commercial-platform-foundation/docs/testing/visual-review-final/inicio-390x844.png) |
+| asistente comercial | [PNG](https://raw.githubusercontent.com/Andresito202/camacho-pos-comercial/feat/commercial-platform-foundation/docs/testing/visual-review-final/asistente-comercial-1920x1080.png) | [PNG](https://raw.githubusercontent.com/Andresito202/camacho-pos-comercial/feat/commercial-platform-foundation/docs/testing/visual-review-final/asistente-comercial-390x844.png) |
 
 ## Software POS
 
@@ -49,6 +51,13 @@ Enlaces **HTTPS** a PNG (raw). También disponibles en el árbol del PR.
 | Vista | Escritorio 1920×1080 | Móvil 390×844 |
 |---|---|---|
 | promociones | [PNG](https://raw.githubusercontent.com/Andresito202/camacho-pos-comercial/feat/commercial-platform-foundation/docs/testing/visual-review-final/promociones-1920x1080.png) | [PNG](https://raw.githubusercontent.com/Andresito202/camacho-pos-comercial/feat/commercial-platform-foundation/docs/testing/visual-review-final/promociones-390x844.png) |
+
+## Prueba 5 días
+
+| Vista | Escritorio 1920×1080 | Móvil 390×844 |
+|---|---|---|
+| prueba 5 dias | [PNG](https://raw.githubusercontent.com/Andresito202/camacho-pos-comercial/feat/commercial-platform-foundation/docs/testing/visual-review-final/prueba-5-dias-1920x1080.png) | [PNG](https://raw.githubusercontent.com/Andresito202/camacho-pos-comercial/feat/commercial-platform-foundation/docs/testing/visual-review-final/prueba-5-dias-390x844.png) |
+| prueba 5 dias estado | [PNG](https://raw.githubusercontent.com/Andresito202/camacho-pos-comercial/feat/commercial-platform-foundation/docs/testing/visual-review-final/prueba-5-dias-estado-1920x1080.png) | [PNG](https://raw.githubusercontent.com/Andresito202/camacho-pos-comercial/feat/commercial-platform-foundation/docs/testing/visual-review-final/prueba-5-dias-estado-390x844.png) |
 
 ## Contratación (modal)
 
@@ -125,6 +134,8 @@ Enlaces **HTTPS** a PNG (raw). También disponibles en el árbol del PR.
 - [admin-productos-kits-390x844.png](https://raw.githubusercontent.com/Andresito202/camacho-pos-comercial/feat/commercial-platform-foundation/docs/testing/visual-review-final/admin-productos-kits-390x844.png)
 - [admin-promociones-1920x1080.png](https://raw.githubusercontent.com/Andresito202/camacho-pos-comercial/feat/commercial-platform-foundation/docs/testing/visual-review-final/admin-promociones-1920x1080.png)
 - [admin-promociones-390x844.png](https://raw.githubusercontent.com/Andresito202/camacho-pos-comercial/feat/commercial-platform-foundation/docs/testing/visual-review-final/admin-promociones-390x844.png)
+- [asistente-comercial-1920x1080.png](https://raw.githubusercontent.com/Andresito202/camacho-pos-comercial/feat/commercial-platform-foundation/docs/testing/visual-review-final/asistente-comercial-1920x1080.png)
+- [asistente-comercial-390x844.png](https://raw.githubusercontent.com/Andresito202/camacho-pos-comercial/feat/commercial-platform-foundation/docs/testing/visual-review-final/asistente-comercial-390x844.png)
 - [blog-1920x1080.png](https://raw.githubusercontent.com/Andresito202/camacho-pos-comercial/feat/commercial-platform-foundation/docs/testing/visual-review-final/blog-1920x1080.png)
 - [blog-390x844.png](https://raw.githubusercontent.com/Andresito202/camacho-pos-comercial/feat/commercial-platform-foundation/docs/testing/visual-review-final/blog-390x844.png)
 - [carrito-1920x1080.png](https://raw.githubusercontent.com/Andresito202/camacho-pos-comercial/feat/commercial-platform-foundation/docs/testing/visual-review-final/carrito-1920x1080.png)
@@ -171,6 +182,10 @@ Enlaces **HTTPS** a PNG (raw). También disponibles en el árbol del PR.
 - [preguntas-frecuentes-390x844.png](https://raw.githubusercontent.com/Andresito202/camacho-pos-comercial/feat/commercial-platform-foundation/docs/testing/visual-review-final/preguntas-frecuentes-390x844.png)
 - [promociones-1920x1080.png](https://raw.githubusercontent.com/Andresito202/camacho-pos-comercial/feat/commercial-platform-foundation/docs/testing/visual-review-final/promociones-1920x1080.png)
 - [promociones-390x844.png](https://raw.githubusercontent.com/Andresito202/camacho-pos-comercial/feat/commercial-platform-foundation/docs/testing/visual-review-final/promociones-390x844.png)
+- [prueba-5-dias-1920x1080.png](https://raw.githubusercontent.com/Andresito202/camacho-pos-comercial/feat/commercial-platform-foundation/docs/testing/visual-review-final/prueba-5-dias-1920x1080.png)
+- [prueba-5-dias-390x844.png](https://raw.githubusercontent.com/Andresito202/camacho-pos-comercial/feat/commercial-platform-foundation/docs/testing/visual-review-final/prueba-5-dias-390x844.png)
+- [prueba-5-dias-estado-1920x1080.png](https://raw.githubusercontent.com/Andresito202/camacho-pos-comercial/feat/commercial-platform-foundation/docs/testing/visual-review-final/prueba-5-dias-estado-1920x1080.png)
+- [prueba-5-dias-estado-390x844.png](https://raw.githubusercontent.com/Andresito202/camacho-pos-comercial/feat/commercial-platform-foundation/docs/testing/visual-review-final/prueba-5-dias-estado-390x844.png)
 - [software-pos-1920x1080.png](https://raw.githubusercontent.com/Andresito202/camacho-pos-comercial/feat/commercial-platform-foundation/docs/testing/visual-review-final/software-pos-1920x1080.png)
 - [software-pos-390x844.png](https://raw.githubusercontent.com/Andresito202/camacho-pos-comercial/feat/commercial-platform-foundation/docs/testing/visual-review-final/software-pos-390x844.png)
 - [soluciones-1920x1080.png](https://raw.githubusercontent.com/Andresito202/camacho-pos-comercial/feat/commercial-platform-foundation/docs/testing/visual-review-final/soluciones-1920x1080.png)
@@ -183,6 +198,5 @@ Enlaces **HTTPS** a PNG (raw). También disponibles en el árbol del PR.
 ## Método
 
 ```bash
-# API + Postgres activos; web en next dev con fixture admin
 cd apps/web && node scripts/visual-review-final.mjs
 ```
