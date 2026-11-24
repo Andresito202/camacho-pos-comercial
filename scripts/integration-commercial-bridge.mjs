@@ -4,7 +4,7 @@
  * Does NOT enable Factus PRODUCTION charges. Uses shared secrets + real HTTP.
  */
 import { spawn, execSync } from "node:child_process";
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { setTimeout as sleep } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -104,6 +104,7 @@ const bridge = run(
   ["--filter", "@pos-platform/central-authority", "commercial-bridge:standalone"],
   {
     NODE_ENV: "development",
+    CENTRAL_BRIDGE_TEST_GATE: "1",
     COMMERCIAL_BRIDGE_KEY: BRIDGE_KEY,
     CENTRAL_TRIAL_WEBHOOK_KEY: TRIAL_KEY,
     COMMERCIAL_BRIDGE_PORT: String(BRIDGE_PORT),
@@ -145,14 +146,29 @@ try {
   await waitHealth(`http://127.0.0.1:${API_PORT}/health`);
   ok("commercial_api_health", `:${API_PORT}`);
 
-  // 1) GLOBAL mint + introspect through bridge (what SessionBridge calls)
-  const minted = await post(
+  // 1) GLOBAL mint requires verified GLOBAL MFA session — bridge key alone must 401.
+  const denied = await post(
     `http://127.0.0.1:${BRIDGE_PORT}/v1/sessions/commercial-bridge/mint`,
-    { role: "SUPERADMIN_GLOBAL", subjectId: "integration-global", jti: `mint-${Date.now()}` },
+    { role: "SUPERADMIN_GLOBAL", jti: `mint-denied-${Date.now()}` },
     { "x-central-commercial-bridge-key": BRIDGE_KEY },
   );
+  if (denied.status !== 401) throw new Error(`expected GLOBAL_SESSION_REQUIRED got ${denied.status}`);
+  ok("central_mint_requires_global_mfa", denied.json.code);
+
+  // Lab harness proves mint+introspect with ExplicitTestGlobalSessionGate headers (not product login).
+  const globalUser = randomUUID();
+  const globalSession = randomUUID();
+  const minted = await post(
+    `http://127.0.0.1:${BRIDGE_PORT}/v1/sessions/commercial-bridge/mint`,
+    { role: "SUPERADMIN_GLOBAL", jti: `mint-${Date.now()}` },
+    {
+      "x-central-commercial-bridge-key": BRIDGE_KEY,
+      "x-test-global-session-id": globalSession,
+      "x-test-global-user-id": globalUser,
+    },
+  );
   if (minted.status !== 200 || !minted.json.accessToken) throw new Error("mint failed");
-  ok("central_mint_global", minted.json.subjectId);
+  ok("central_mint_global_with_mfa_gate", minted.json.subjectId);
 
   const introspect = await post(
     `http://127.0.0.1:${BRIDGE_PORT}/v1/sessions/introspect`,

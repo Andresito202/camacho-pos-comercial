@@ -91,11 +91,21 @@ export class CrmController {
     @Headers("x-central-trial-webhook-key") webhookKey?: string,
   ) {
     await this.rateLimit.assertAsync(`crm:trial-activate:${req.ip ?? "unknown"}`, 30, 60_000);
-    const payload = (body ?? {}) as { centralLicenseRef?: string };
+    const payload = (body ?? {}) as {
+      centralLicenseRef?: string;
+      startsAt?: string;
+      expiresAt?: string;
+      trialHours?: number;
+      offlineGrace?: boolean;
+    };
     return this.crm.activateFromCentral({
       trialId: id,
       webhookKey,
       centralLicenseRef: payload.centralLicenseRef ?? "",
+      startsAt: payload.startsAt,
+      expiresAt: payload.expiresAt,
+      trialHours: payload.trialHours,
+      offlineGrace: payload.offlineGrace,
     });
   }
 

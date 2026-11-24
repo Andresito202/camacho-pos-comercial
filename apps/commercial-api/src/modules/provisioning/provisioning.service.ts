@@ -43,6 +43,13 @@ export class ProvisioningService {
     if (existing) return existing;
 
     const licenseUnits = order.items.reduce((sum, item) => sum + item.quantity, 0);
+    // Top-level planId when all line items share one Central plan UUID.
+    // tenantId is supplied only when Central tenancy binding exists on the payload path
+    // (QUEUED until both tenantId+planId are present for ISSUED fulfillment).
+    const planIds = [
+      ...new Set(order.items.map((item) => item.planId).filter((id): id is string => Boolean(id))),
+    ];
+    const planId = planIds.length === 1 ? planIds[0] : undefined;
 
     const payload = {
       orderId: order.id,
@@ -51,6 +58,7 @@ export class ProvisioningService {
       businessProfileId: order.businessProfileId,
       licenseUnits,
       cajaRule: "ONE_LICENSE_ONE_CAJA",
+      ...(planId ? { planId } : {}),
       items: order.items.map((item) => ({
         label: item.label,
         quantity: item.quantity,
@@ -169,20 +177,49 @@ export class ProvisioningService {
       if (!response.ok) {
         throw new Error(`CENTRAL_HTTP_${response.status}`);
       }
+      const body = (await response.json()) as {
+        status?: string;
+        fulfillment?: string;
+        provisioningId?: string;
+        licenseIds?: string[];
+      };
+      if (body.status !== "ACCEPTED" && body.status !== "DUPLICATE") {
+        throw new Error(`CENTRAL_PROVISIONING_STATUS_${body.status ?? "UNKNOWN"}`);
+      }
+      const issued =
+        body.fulfillment === "ISSUED" || body.fulfillment === "ALREADY_ISSUED";
+      const licenseIds = Array.isArray(body.licenseIds) ? body.licenseIds : [];
+      // Queue ack alone must not mark the commercial order FULFILLED — need real licenseIds.
+      if (issued && licenseIds.length === 0) {
+        throw new Error("CENTRAL_ISSUED_WITHOUT_LICENSE_IDS");
+      }
       await this.prisma.provisioningRequest.update({
         where: { id },
         data: {
-          status: "SENT",
+          status: issued ? "SENT" : "QUEUED",
           attemptCount: item.attemptCount + 1,
-          lastError: null,
+          lastError: issued
+            ? null
+            : `CENTRAL_FULFILLMENT_${body.fulfillment ?? "QUEUED"}`,
           acknowledgedAt: new Date(),
+          ...(issued
+            ? {
+                payload: {
+                  ...(item.payload as Record<string, unknown>),
+                  centralLicenseIds: licenseIds,
+                  centralProvisioningId: body.provisioningId,
+                },
+              }
+            : {}),
         },
       });
-      await this.prisma.order.update({
-        where: { id: item.orderId },
-        data: { status: "FULFILLED" },
-      });
-      return { id, status: "SENT" };
+      if (issued) {
+        await this.prisma.order.update({
+          where: { id: item.orderId },
+          data: { status: "FULFILLED" },
+        });
+      }
+      return { id, status: issued ? "SENT" : "QUEUED", fulfillment: body.fulfillment, licenseIds };
     } catch (error) {
       const message = error instanceof Error ? error.message : "UNKNOWN";
       await this.prisma.provisioningRequest.update({

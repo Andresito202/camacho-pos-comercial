@@ -337,14 +337,34 @@ export class CrmService {
     trialId: string;
     webhookKey: string | undefined;
     centralLicenseRef: string;
+    startsAt?: string;
+    expiresAt?: string;
+    trialHours?: number;
+    offlineGrace?: boolean;
   }) {
     await this.assertCentralWebhookKey(input.webhookKey);
     if (!input.centralLicenseRef || input.centralLicenseRef.trim().length < 8) {
       throw new BadRequestException({ code: "CENTRAL_LICENSE_REF_REQUIRED" });
     }
-
-    const startsAt = new Date();
-    const expiresAt = new Date(startsAt.getTime() + TRIAL_DAYS * 24 * 60 * 60 * 1000);
+    // Central is the clock authority — no local grace and no fraudulent local restart of the window.
+    if (input.offlineGrace === true) {
+      throw new BadRequestException({ code: "TRIAL_OFFLINE_GRACE_FORBIDDEN" });
+    }
+    if (input.trialHours !== undefined && input.trialHours !== 120) {
+      throw new BadRequestException({ code: "TRIAL_HOURS_MUST_BE_120" });
+    }
+    if (!input.startsAt || !input.expiresAt) {
+      throw new BadRequestException({ code: "CENTRAL_TRIAL_WINDOW_REQUIRED" });
+    }
+    const startsAt = new Date(input.startsAt);
+    const expiresAt = new Date(input.expiresAt);
+    if (!Number.isFinite(startsAt.getTime()) || !Number.isFinite(expiresAt.getTime())) {
+      throw new BadRequestException({ code: "CENTRAL_TRIAL_WINDOW_INVALID" });
+    }
+    const windowMs = expiresAt.getTime() - startsAt.getTime();
+    if (windowMs !== 120 * 60 * 60 * 1000) {
+      throw new BadRequestException({ code: "CENTRAL_TRIAL_WINDOW_NOT_120H" });
+    }
     const licenseRef = input.centralLicenseRef.trim();
 
     // Conditional update — exactly-once activation under concurrent webhook delivery.
@@ -389,8 +409,10 @@ export class CrmService {
       entityId: trial.id,
       metadata: {
         centralLicenseRef: licenseRef,
+        startsAt: startsAt.toISOString(),
         expiresAt: expiresAt.toISOString(),
-        trialHours: TRIAL_DAYS * 24,
+        trialHours: 120,
+        offlineGrace: false,
       },
     });
 
