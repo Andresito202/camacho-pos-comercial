@@ -7,6 +7,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Req,
   UseGuards,
 } from "@nestjs/common";
@@ -21,6 +22,32 @@ import { CatalogService } from "../catalog/catalog.service.js";
 import { ContentService } from "../content/content.service.js";
 import { PromotionsService } from "../promotions/promotions.service.js";
 import { SupportService } from "../support/support.service.js";
+
+const LeadStatusFilter = z
+  .enum(["NEW", "CONTACTED", "QUALIFIED", "DEMO_SCHEDULED", "WON", "LOST", "ARCHIVED"])
+  .optional();
+const OrderStatusFilter = z
+  .enum([
+    "PENDING_PAYMENT",
+    "PAID",
+    "PROVISIONING",
+    "FULFILLED",
+    "CANCELLED",
+    "REFUNDED",
+    "FAILED",
+  ])
+  .optional();
+const PaymentStatusFilter = z
+  .enum([
+    "PENDING",
+    "REQUIRES_ACTION",
+    "AUTHORIZED",
+    "PAID",
+    "FAILED",
+    "CANCELLED",
+    "REFUNDED",
+  ])
+  .optional();
 
 const UpdatePriceSchema = z
   .object({
@@ -64,6 +91,11 @@ const ProductCreateSchema = z
     sortOrder: z.number().int().optional(),
     imageUrl: z.string().optional(),
     imageAlt: z.string().optional(),
+    /** Flat fields from admin forms (preferred over nested `variant`). */
+    variantSku: z.string().min(1).optional(),
+    variantName: z.string().min(1).optional(),
+    variantAmountCents: MoneyCentsSchema.optional(),
+    quantityOnHand: z.number().int().optional(),
     variant: z
       .object({
         sku: z.string().min(1),
@@ -73,7 +105,28 @@ const ProductCreateSchema = z
       })
       .optional(),
   })
-  .strict();
+  .strict()
+  .transform((raw) => {
+    const {
+      variantSku,
+      variantName,
+      variantAmountCents,
+      quantityOnHand,
+      variant,
+      ...rest
+    } = raw;
+    const resolvedVariant =
+      variant ??
+      (variantSku && variantName && variantAmountCents != null
+        ? {
+            sku: variantSku,
+            name: variantName,
+            amountCents: variantAmountCents,
+            ...(quantityOnHand != null ? { quantityOnHand } : {}),
+          }
+        : undefined);
+    return { ...rest, ...(resolvedVariant ? { variant: resolvedVariant } : {}) };
+  });
 
 const ProductPatchSchema = z
   .object({
@@ -473,9 +526,13 @@ export class AdminController {
   // ─── Pedidos / pagos / clientes ──────────────────────────────────────────
 
   @Get("pedidos")
-  listOrders() {
+  listOrders(@Query("status") statusRaw?: string) {
+    const status = OrderStatusFilter.safeParse(statusRaw || undefined).data;
     return this.prisma.order.findMany({
-      where: { deletedAt: null },
+      where: {
+        deletedAt: null,
+        ...(status ? { status } : {}),
+      },
       include: {
         customer: { select: { id: true, fullName: true, email: true } },
         items: true,
@@ -487,8 +544,12 @@ export class AdminController {
   }
 
   @Get("pagos")
-  listPayments() {
+  listPayments(@Query("status") statusRaw?: string) {
+    const status = PaymentStatusFilter.safeParse(statusRaw || undefined).data;
     return this.prisma.payment.findMany({
+      where: {
+        ...(status ? { status } : {}),
+      },
       include: {
         customer: { select: { id: true, fullName: true, email: true } },
         order: { select: { id: true, orderNumber: true, status: true } },
@@ -499,25 +560,53 @@ export class AdminController {
   }
 
   @Get("clientes")
-  async listCustomers() {
+  async listCustomers(
+    @Query("status") statusRaw?: string,
+    @Query("q") qRaw?: string,
+  ) {
+    const status = LeadStatusFilter.safeParse(statusRaw || undefined).data;
+    const q = (qRaw ?? "").trim();
+    const textFilter = q
+      ? {
+          OR: [
+            { fullName: { contains: q, mode: "insensitive" as const } },
+            { email: { contains: q, mode: "insensitive" as const } },
+          ],
+        }
+      : {};
+    const leadWhere = {
+      deletedAt: null,
+      ...(status ? { status } : {}),
+      ...textFilter,
+    };
     const [contacts, leads, demos, customers] = await Promise.all([
       this.prisma.contactRequest.findMany({
-        where: { deletedAt: null },
+        where: leadWhere,
         orderBy: { createdAt: "desc" },
         take: 100,
       }),
       this.prisma.lead.findMany({
-        where: { deletedAt: null },
+        where: leadWhere,
         orderBy: { createdAt: "desc" },
         take: 100,
       }),
       this.prisma.demoRequest.findMany({
-        where: { deletedAt: null },
+        where: leadWhere,
         orderBy: { createdAt: "desc" },
         take: 100,
       }),
       this.prisma.commercialCustomer.findMany({
-        where: { deletedAt: null },
+        where: {
+          deletedAt: null,
+          ...(q
+            ? {
+                OR: [
+                  { fullName: { contains: q, mode: "insensitive" as const } },
+                  { email: { contains: q, mode: "insensitive" as const } },
+                ],
+              }
+            : {}),
+        },
         orderBy: { createdAt: "desc" },
         take: 100,
       }),

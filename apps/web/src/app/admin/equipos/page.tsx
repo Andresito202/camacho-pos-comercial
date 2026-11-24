@@ -1,5 +1,9 @@
 import { cookies } from "next/headers";
-import { AdminActionForm, AdminSection } from "@/components/admin/AdminClientForms";
+import {
+  AdminActionForm,
+  AdminEmptyState,
+  AdminSection,
+} from "@/components/admin/AdminClientForms";
 import { adminFetch } from "@/lib/api";
 import { ADMIN_TOKEN_COOKIE } from "@/lib/auth";
 import { formatMoney } from "@/lib/format";
@@ -72,6 +76,7 @@ export default async function AdminEquiposPage() {
                 { value: "HARDWARE", label: "HARDWARE" },
                 { value: "ACCESSORY", label: "ACCESSORY" },
                 { value: "SERVICE", label: "SERVICE" },
+                { value: "KIT", label: "KIT" },
               ],
             },
             {
@@ -79,11 +84,37 @@ export default async function AdminEquiposPage() {
               label: "URL imagen (SVG preferido)",
               defaultValue: "/images/hardware/terminal-tactil.svg",
             },
+            {
+              name: "variantSku",
+              label: "SKU variante",
+              required: true,
+              hint: "Crea variante + stock inicial en la misma operación",
+            },
+            { name: "variantName", label: "Nombre variante", required: true, defaultValue: "Estándar" },
+            {
+              name: "variantAmountCents",
+              label: "Precio variante (COP enteros)",
+              type: "number",
+              required: true,
+              defaultValue: 0,
+            },
+            {
+              name: "quantityOnHand",
+              label: "Inventario inicial",
+              type: "number",
+              defaultValue: 0,
+            },
           ]}
         />
       </AdminSection>
 
       <AdminSection title="Productos">
+        {(products ?? []).length === 0 ? (
+          <AdminEmptyState
+            title="Sin productos"
+            detail="Crea el primer equipo o accesorio con el formulario de arriba."
+          />
+        ) : null}
         <div className="space-y-6">
           {(products ?? []).map((product) => (
             <div key={product.id} className="border border-[var(--border)] bg-white/70 p-4">

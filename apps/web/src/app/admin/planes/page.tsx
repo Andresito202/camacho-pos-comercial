@@ -1,5 +1,9 @@
 import { cookies } from "next/headers";
-import { AdminActionForm, AdminSection } from "@/components/admin/AdminClientForms";
+import {
+  AdminActionForm,
+  AdminEmptyState,
+  AdminSection,
+} from "@/components/admin/AdminClientForms";
 import { adminFetch } from "@/lib/api";
 import { ADMIN_TOKEN_COOKIE } from "@/lib/auth";
 import { formatMoney } from "@/lib/format";
@@ -31,6 +35,15 @@ export default async function AdminPlanesPage() {
       <p className="mt-2 text-[var(--muted)]">
         Actualiza metadatos, features y montos vía PATCH/POST reales del commercial-api.
       </p>
+
+      {plans.length === 0 ? (
+        <div className="mt-8">
+          <AdminEmptyState
+            title="Sin planes"
+            detail="No hay planes en Postgres o el API admin no respondió."
+          />
+        </div>
+      ) : null}
 
       {plans.map((plan) => (
         <AdminSection key={plan.id} title={`${plan.name} (${plan.slug})`}>

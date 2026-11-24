@@ -2,7 +2,25 @@ import { BadRequestException, Inject, Injectable, NotFoundException } from "@nes
 import type { PrismaClient, PublicationStatus } from "@camacho-pos-comercial/database";
 import { MoneyCentsSchema } from "@camacho-pos-comercial/contracts";
 import { PRISMA } from "../../common/prisma.tokens.js";
-import { bogotaNow, formatBogotaIsoDate, isWithinWindow } from "../../common/time/bogota.js";
+import {
+  bogotaNow,
+  formatBogotaIsoDate,
+  isWithinWindow,
+  parseBogotaDateTime,
+} from "../../common/time/bogota.js";
+
+function optionalBogotaDate(value: string | null | undefined): Date | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
+  try {
+    return parseBogotaDateTime(value);
+  } catch {
+    throw new BadRequestException({
+      code: "INVALID_BOGOTA_DATETIME",
+      message: "startsAt/endsAt must be America/Bogota wall-clock or ISO datetime",
+    });
+  }
+}
 
 export type PublicPromotionDto = {
   id: string;
@@ -70,8 +88,8 @@ export class PromotionsService {
         name: input.name,
         description: input.description,
         publicationStatus: input.publicationStatus ?? "DRAFT",
-        startsAt: input.startsAt ? new Date(input.startsAt) : null,
-        endsAt: input.endsAt ? new Date(input.endsAt) : null,
+        startsAt: optionalBogotaDate(input.startsAt) ?? null,
+        endsAt: optionalBogotaDate(input.endsAt) ?? null,
       },
     });
   }
@@ -88,18 +106,16 @@ export class PromotionsService {
   ) {
     const existing = await this.prisma.promotion.findFirst({ where: { id, deletedAt: null } });
     if (!existing) throw new NotFoundException({ code: "PROMOTION_NOT_FOUND" });
+    const startsAt = optionalBogotaDate(input.startsAt);
+    const endsAt = optionalBogotaDate(input.endsAt);
     return this.prisma.promotion.update({
       where: { id },
       data: {
         ...(input.name != null ? { name: input.name } : {}),
         ...(input.description !== undefined ? { description: input.description } : {}),
         ...(input.publicationStatus != null ? { publicationStatus: input.publicationStatus } : {}),
-        ...(input.startsAt !== undefined
-          ? { startsAt: input.startsAt ? new Date(input.startsAt) : null }
-          : {}),
-        ...(input.endsAt !== undefined
-          ? { endsAt: input.endsAt ? new Date(input.endsAt) : null }
-          : {}),
+        ...(startsAt !== undefined ? { startsAt } : {}),
+        ...(endsAt !== undefined ? { endsAt } : {}),
       },
     });
   }
@@ -141,8 +157,8 @@ export class PromotionsService {
         amountOffCents: input.amountOffCents ?? null,
         minSubtotalCents: input.minSubtotalCents ?? null,
         maxRedemptions: input.maxRedemptions ?? null,
-        startsAt: input.startsAt ? new Date(input.startsAt) : null,
-        endsAt: input.endsAt ? new Date(input.endsAt) : null,
+        startsAt: optionalBogotaDate(input.startsAt) ?? null,
+        endsAt: optionalBogotaDate(input.endsAt) ?? null,
         active: input.active ?? true,
         promotionId: input.promotionId ?? null,
       },
@@ -165,6 +181,8 @@ export class PromotionsService {
   ) {
     const existing = await this.prisma.coupon.findFirst({ where: { id, deletedAt: null } });
     if (!existing) throw new NotFoundException({ code: "COUPON_NOT_FOUND" });
+    const startsAt = optionalBogotaDate(input.startsAt);
+    const endsAt = optionalBogotaDate(input.endsAt);
     return this.prisma.coupon.update({
       where: { id },
       data: {
@@ -175,12 +193,8 @@ export class PromotionsService {
           ? { minSubtotalCents: input.minSubtotalCents }
           : {}),
         ...(input.maxRedemptions !== undefined ? { maxRedemptions: input.maxRedemptions } : {}),
-        ...(input.startsAt !== undefined
-          ? { startsAt: input.startsAt ? new Date(input.startsAt) : null }
-          : {}),
-        ...(input.endsAt !== undefined
-          ? { endsAt: input.endsAt ? new Date(input.endsAt) : null }
-          : {}),
+        ...(startsAt !== undefined ? { startsAt } : {}),
+        ...(endsAt !== undefined ? { endsAt } : {}),
         ...(input.active !== undefined ? { active: input.active } : {}),
         ...(input.promotionId !== undefined ? { promotionId: input.promotionId } : {}),
       },

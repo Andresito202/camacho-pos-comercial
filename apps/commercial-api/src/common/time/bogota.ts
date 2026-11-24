@@ -19,6 +19,52 @@ export function formatBogotaIsoDate(value: Date | null | undefined): string | nu
 }
 
 /**
+ * Format an instant as `YYYY-MM-DDTHH:mm` wall-clock in America/Bogota
+ * (suitable for HTML datetime-local inputs).
+ */
+export function formatBogotaDatetimeLocal(value: Date | null | undefined): string | null {
+  if (!value) return null;
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: BOGOTA_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(value);
+  const pick = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((p) => p.type === type)?.value ?? "00";
+  return `${pick("year")}-${pick("month")}-${pick("day")}T${pick("hour")}:${pick("minute")}`;
+}
+
+/**
+ * Parse admin scheduling input as America/Bogota wall-clock.
+ * Accepts:
+ * - `YYYY-MM-DDTHH:mm` / `YYYY-MM-DDTHH:mm:ss` (interpreted as Bogota local)
+ * - full ISO with Z or offset (passed through Date)
+ */
+export function parseBogotaDateTime(value: string): Date {
+  const trimmed = value.trim();
+  const localMatch = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?$/.exec(trimmed);
+  if (localMatch && !/[zZ]|[+-]\d{2}:?\d{2}$/.test(trimmed)) {
+    const y = Number(localMatch[1]);
+    const m = Number(localMatch[2]);
+    const d = Number(localMatch[3]);
+    const hh = Number(localMatch[4]);
+    const mm = Number(localMatch[5]);
+    const ss = Number(localMatch[6] ?? "0");
+    // America/Bogota is fixed UTC-5
+    return new Date(Date.UTC(y, m - 1, d, hh + 5, mm, ss));
+  }
+  const parsed = new Date(trimmed);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new Error(`Invalid Bogota datetime: ${value}`);
+  }
+  return parsed;
+}
+
+/**
  * Build a Date for a Bogota local wall-clock (year-month-day hour:minute:second).
  * Used by seed to place campaign windows relative to "today" in Colombia.
  */

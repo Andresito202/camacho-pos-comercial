@@ -1,5 +1,9 @@
 import { cookies } from "next/headers";
-import { AdminActionForm, AdminSection } from "@/components/admin/AdminClientForms";
+import {
+  AdminActionForm,
+  AdminEmptyState,
+  AdminSection,
+} from "@/components/admin/AdminClientForms";
 import { adminFetch } from "@/lib/api";
 import { ADMIN_TOKEN_COOKIE } from "@/lib/auth";
 
@@ -25,7 +29,7 @@ export default async function AdminTicketsPage() {
       <AdminSection title="Abiertos / recientes">
         <div className="space-y-6">
           {tickets.length === 0 ? (
-            <p className="text-sm text-[var(--muted)]">Sin tickets.</p>
+            <AdminEmptyState title="Sin tickets" detail="Cuando haya soporte entrante, responde aquí." />
           ) : (
             tickets.map((ticket) => (
               <div key={ticket.id} className="border border-[var(--border)] bg-white/70 p-4">
