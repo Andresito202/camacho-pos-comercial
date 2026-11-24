@@ -8,6 +8,9 @@ coverage
 .turbo
 .DS_Store
 *.tsbuildinfo
+.next
+apps/web/.next
 apps/commercial-api/dist
 packages/*/dist
 packages/database/prisma/generated
+apps/web/.env.local

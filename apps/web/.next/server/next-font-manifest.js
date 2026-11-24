@@ -1,1 +1,0 @@
-self.__NEXT_FONT_MANIFEST='{"pages":{},"app":{"/agent/repos/camacho-pos-comercial/apps/web/src/app/layout":["static/media/597b6a5d799c44de-s.p.woff2","static/media/13971731025ec697-s.p.woff2"]},"appUsingSizeAdjust":true,"pagesUsingSizeAdjust":false}';
