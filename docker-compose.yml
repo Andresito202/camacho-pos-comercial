@@ -5,7 +5,7 @@
 # the file is still the canonical compose definition.
 #
 # Usage (from repo root):
-#   cp .env.example .env   # fill secrets; never commit real credentials
+#   cp .env.example .env   # generate a unique hex password and fill POSTGRES_PASSWORD; never commit .env
 #   docker compose up -d --build
 #   docker compose exec commercial-api sh -c "cd /app && pnpm prisma:migrate:deploy && pnpm prisma:seed"
 
@@ -17,10 +17,10 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-comercial}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-comercial_dev}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       POSTGRES_DB: ${POSTGRES_DB:-camacho_pos_comercial}
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432"
     volumes:
       - comercial_pg_data:/var/lib/postgresql/data
     healthcheck:
@@ -43,7 +43,7 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       PORT: "4000"
-      DATABASE_URL: postgresql://${POSTGRES_USER:-comercial}:${POSTGRES_PASSWORD:-comercial_dev}@postgres:5432/${POSTGRES_DB:-camacho_pos_comercial}?schema=public
+      DATABASE_URL: postgresql://${POSTGRES_USER:-comercial}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-camacho_pos_comercial}?schema=public
       PUBLIC_SITE_ORIGIN: ${PUBLIC_SITE_ORIGIN:-http://127.0.0.1:3000}
       CENTRAL_AUTHORITY_ORIGIN: ${CENTRAL_AUTHORITY_ORIGIN:-}
       CENTRAL_SESSION_BRIDGE_ENABLED: ${CENTRAL_SESSION_BRIDGE_ENABLED:-false}
