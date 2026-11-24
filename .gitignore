@@ -19,3 +19,8 @@ apps/commercial-api/dist
 packages/*/dist
 packages/database/prisma/generated
 apps/web/.env.local
+apps/web/test-results
+apps/web/playwright-report
+apps/web/blob-report
+apps/web/playwright/.cache
+infrastructure/docker/.env

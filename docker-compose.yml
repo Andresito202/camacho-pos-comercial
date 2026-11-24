@@ -1,0 +1,117 @@
+# Camacho POS Comercial — local / staging stack
+# Ports chosen to avoid common collisions with other projects:
+#   postgres 5433 → host, commercial-api 4000, web 3000
+# Requires Docker Engine + Compose plugin. This VM may not have Docker installed;
+# the file is still the canonical compose definition.
+#
+# Usage (from repo root):
+#   cp .env.example .env   # fill secrets; never commit real credentials
+#   docker compose up -d --build
+#   docker compose exec commercial-api sh -c "cd /app && pnpm prisma:migrate:deploy && pnpm prisma:seed"
+
+name: camacho-pos-comercial
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-comercial}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-comercial_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-camacho_pos_comercial}
+    ports:
+      - "5433:5432"
+    volumes:
+      - comercial_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  commercial-api:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: "4000"
+      DATABASE_URL: postgresql://${POSTGRES_USER:-comercial}:${POSTGRES_PASSWORD:-comercial_dev}@postgres:5432/${POSTGRES_DB:-camacho_pos_comercial}?schema=public
+      PUBLIC_SITE_ORIGIN: ${PUBLIC_SITE_ORIGIN:-http://127.0.0.1:3000}
+      CENTRAL_AUTHORITY_ORIGIN: ${CENTRAL_AUTHORITY_ORIGIN:-}
+      CENTRAL_SESSION_BRIDGE_ENABLED: ${CENTRAL_SESSION_BRIDGE_ENABLED:-false}
+      FACTUS_PAY_MODE: ${FACTUS_PAY_MODE:-SANDBOX}
+      FACTUS_PAY_SANDBOX_ENABLED: ${FACTUS_PAY_SANDBOX_ENABLED:-true}
+      FACTUS_PAY_PRODUCTION_ENABLED: ${FACTUS_PAY_PRODUCTION_ENABLED:-false}
+      WHATSAPP_BUSINESS_NUMBER: ${WHATSAPP_BUSINESS_NUMBER:-573000000000_DEV_PLACEHOLDER}
+    ports:
+      - "4000:4000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:4000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  web:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.web
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://127.0.0.1:4000}
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://127.0.0.1:3000}
+        NEXT_PUBLIC_CENTRAL_AUTHORITY_ORIGIN: ${NEXT_PUBLIC_CENTRAL_AUTHORITY_ORIGIN:-}
+        NEXT_PUBLIC_WHATSAPP_NUMBER: ${NEXT_PUBLIC_WHATSAPP_NUMBER:-573000000000}
+    restart: unless-stopped
+    depends_on:
+      commercial-api:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: 0.0.0.0
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Optional reverse proxy — enable with: docker compose --profile with-nginx up -d
+  nginx:
+    profiles: ["with-nginx"]
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_healthy
+      commercial-api:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+    volumes:
+      - ./infrastructure/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+
+volumes:
+  comercial_pg_data:
