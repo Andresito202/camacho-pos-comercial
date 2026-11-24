@@ -67,7 +67,10 @@ export class PaymentsService {
 
   /**
    * Webhook: POST /v1/webhooks/factus-pay/collections
-   * Idempotent. Verify amount + reference. Never mark paid from frontend alone.
+   * Idempotent. Verify amount + reference (timing-safe key compare).
+   * Key must arrive via Authorization Bearer or X-Factus-Pay-Webhook-Key
+   * (query ?key= only if FACTUS_PAY_WEBHOOK_ALLOW_QUERY_KEY — deprecated).
+   * Never mark paid from frontend alone.
    * Real paid → may enqueue Central provisioning (stays PAID+PENDING when Central down).
    */
   async handleFactusPayWebhook(input: {

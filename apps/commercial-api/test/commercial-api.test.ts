@@ -258,14 +258,17 @@ describe("commercial-api critical paths", () => {
       },
     };
 
-    const first = await inject("POST", `/v1/webhooks/factus-pay/collections?key=${key}`, {
+    // Prefer Authorization Bearer (not query ?key= — Referer/log leak).
+    const first = await inject("POST", "/v1/webhooks/factus-pay/collections", {
       payload,
+      headers: { authorization: `Bearer ${key}` },
     });
     expect([200, 201]).toContain(first.statusCode);
     expect(first.json().result).toBe("STORED");
 
-    const second = await inject("POST", `/v1/webhooks/factus-pay/collections?key=${key}`, {
+    const second = await inject("POST", "/v1/webhooks/factus-pay/collections", {
       payload,
+      headers: { "x-factus-pay-webhook-key": key },
     });
     expect([200, 201]).toContain(second.statusCode);
     expect(second.json().result).toBe("DUPLICATE");

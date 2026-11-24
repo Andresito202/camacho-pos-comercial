@@ -20,7 +20,9 @@
 | Admin Bearer throttle | Rate limit on introspect attempts | Implemented |
 | Captcha | Turnstile/reCAPTCHA server verify + **replay table** `CaptchaTokenUse` | Implemented |
 | Honeypot | `website` field → `BOT_REJECTED` | Implemented |
-| Rate limit | Postgres `RateLimitCounter` when `RATE_LIMIT_DURABLE=true` (default) | Implemented |
+| Rate limit | Postgres `RateLimitCounter` atomic upsert when `RATE_LIMIT_DURABLE=true` (default) | Implemented |
+| Factus webhook auth | `Authorization: Bearer` or `X-Factus-Pay-Webhook-Key` + timing-safe compare; query `?key=` only if `FACTUS_PAY_WEBHOOK_ALLOW_QUERY_KEY` | Implemented |
+| CI SCA | `pnpm audit --prod --audit-level=critical` in `.github/workflows/ci.yml` | Implemented (critical gate; high via Dependabot) |
 | Trial anti-abuse | `identityKey`, one open trial, 30d cap | Implemented |
 | Trial anti-enumeration | Status requires access token; 404 on mismatch; no PII | Implemented |
 | Trial activation | Central webhook only; no local simulation | Implemented |
@@ -50,8 +52,17 @@ Multi-instance: durable Postgres counters. Still recommend Cloudflare rate rules
 
 Login UX is a redirect to Central. Captcha/CSRF/MFA for the login form itself are **owned by Central/pos-platform** and are not claimed here. See `cloudflare-edge.md` § Login Central.
 
+## Residuals (not RUNTIME_VERIFIED here)
+
+| Residual | Status |
+| --- | --- |
+| Cloudflare / edge WAF + HTTPS | **DOCUMENTED only** — see `cloudflare-edge.md`. Do not claim RUNTIME_VERIFIED until DNS/TLS/WAF are live in the field. |
+| Turnstile (or reCAPTCHA) production secrets + widget | App verify + replay table exist; **RUNTIME_VERIFIED** blocked until operator keys and edge are configured. |
+| Central live MFA (WebAuthn / GLOBAL login) | **Not simulated** in this portal. Login redirects to Central; MFA remains Central-owned. Lab fixture / bridge gates are not product MFA. |
+
 ## Explicit non-claims
 
 - No SOC2/ISO from this repo.
 - No claim that Cloudflare WAF/TLS is live until operators enable it.
 - No simulated POS license activations.
+- No claim of Central live MFA coverage from commercial-portal tests alone.

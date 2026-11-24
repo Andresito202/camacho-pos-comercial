@@ -50,4 +50,6 @@ Documentar en Central: Turnstile en login GLOBAL, lockout, MFA ops — fuera del
 
 ## Evidencia
 
-Hasta publicar DNS/TLS reales, este archivo es **DOCUMENTED** únicamente. No declarar RUNTIME_VERIFIED de WAF.
+Hasta publicar DNS/TLS reales, este archivo es **DOCUMENTED** únicamente. No declarar RUNTIME_VERIFIED de WAF ni de Turnstile en edge.
+
+**Residual (security hardening 2026-11-24):** Turnstile/edge WAF RUNTIME_VERIFIED remains blocked pending field DNS/TLS/WAF + operator captcha secrets. Central live MFA is not simulated by this portal.

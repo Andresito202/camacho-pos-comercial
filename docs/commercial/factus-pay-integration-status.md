@@ -27,7 +27,8 @@ Resolved by `resolveFactusPayGate` in `@camacho-pos-comercial/configuration`:
 | `FACTUS_PAY_PRODUCTION_BASE_URL` | Default `https://pay-api.factus.com.co` | IMPLEMENTADO |
 | `FACTUS_PAY_SANDBOX_EMAIL` / `FACTUS_PAY_SANDBOX_PASSWORD` | Official `/auth` credentials | IMPLEMENTADO (preferred) |
 | `FACTUS_PAY_SANDBOX_CLIENT_ID` / `FACTUS_PAY_SANDBOX_CLIENT_SECRET` | Aliases for email/password (historical names) | IMPLEMENTADO |
-| `FACTUS_PAY_SANDBOX_WEBHOOK_KEY` | Query `key` for webhook HMAC-style compare (≥32 recommended) | IMPLEMENTADO |
+| `FACTUS_PAY_SANDBOX_WEBHOOK_KEY` | Webhook shared secret (≥32 recommended); send via `Authorization: Bearer` or `X-Factus-Pay-Webhook-Key` | IMPLEMENTADO |
+| `FACTUS_PAY_WEBHOOK_ALLOW_QUERY_KEY` | Deprecated `?key=` fallback (default `false`, fail-closed) | IMPLEMENTADO |
 | `FACTUS_PAY_PRODUCTION_EMAIL` / `FACTUS_PAY_PRODUCTION_PASSWORD` | Production `/auth` | IMPLEMENTADO (required when production enabled) |
 | `FACTUS_PAY_PRODUCTION_CLIENT_ID` / `FACTUS_PAY_PRODUCTION_CLIENT_SECRET` | Aliases | IMPLEMENTADO |
 | `FACTUS_PAY_PRODUCTION_WEBHOOK_KEY` | Production webhook key (≥32 when production) | IMPLEMENTADO |
@@ -42,10 +43,11 @@ Resolved by `resolveFactusPayGate` in `@camacho-pos-comercial/configuration`:
 | Create collection | `POST /v1/collections` | `{ reference_code, amount, expiration }` — amount in COP pesos; `expiration` in seconds. |
 | Get collection | `GET /v1/collections/:referenceCode` | Detail + QR |
 | List collections | `GET /v1/collections` | Paginated; optional `status`, `reference_code` |
-| Webhook | `POST <your-url>?key=<llave>` | Body `{ data: { reference_code, amount, status: "paid", ... } }` |
+| Webhook | Factus docs show `POST <your-url>?key=<llave>`; portal prefers header transport | Body `{ data: { reference_code, amount, status: "paid", ... } }` |
 
 Commercial adapter path: `apps/commercial-api/src/modules/payments/factus-pay.adapter.ts`  
-Webhook path: `POST /v1/webhooks/factus-pay/collections`
+Webhook path: `POST /v1/webhooks/factus-pay/collections`  
+Auth: `Authorization: Bearer <key>` or `X-Factus-Pay-Webhook-Key: <key>` (timing-safe). Query `?key=` only when `FACTUS_PAY_WEBHOOK_ALLOW_QUERY_KEY=true`.
 
 ## How pos-platform Central subscription Factus gateway works
 

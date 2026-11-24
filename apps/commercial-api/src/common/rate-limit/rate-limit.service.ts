@@ -7,6 +7,7 @@ type Bucket = { count: number; resetAt: number };
 
 /**
  * Rate limiter with durable Postgres counters when RATE_LIMIT_DURABLE=true.
+ * Durable path uses one atomic upsert (no find-then-update race).
  * Call `assertAsync` from controllers (await). Memory fallback when durable is off.
  * Not a substitute for Cloudflare WAF — see docs/security/cloudflare-edge.md.
  */
@@ -59,31 +60,43 @@ export class RateLimitService {
     existing.count += 1;
   }
 
+  /**
+   * Single-statement upsert: reset expired windows or atomically increment.
+   * Avoids TOCTOU between findUnique and update under concurrent requests.
+   */
   private async assertDurable(key: string, limit: number, windowMs: number): Promise<void> {
     const now = new Date();
     const resetAt = new Date(now.getTime() + windowMs);
-    const row = await this.prisma!.rateLimitCounter.findUnique({ where: { key } });
-    if (!row || row.resetAt <= now) {
-      await this.prisma!.rateLimitCounter.upsert({
-        where: { key },
-        create: { key, count: 1, resetAt },
-        update: { count: 1, resetAt },
-      });
-      return;
+    const rows = await this.prisma!.$queryRaw<Array<{ count: number; resetAt: Date }>>`
+      INSERT INTO "RateLimitCounter" ("key", "count", "resetAt")
+      VALUES (${key}, 1, ${resetAt})
+      ON CONFLICT ("key") DO UPDATE SET
+        "count" = CASE
+          WHEN "RateLimitCounter"."resetAt" <= ${now} THEN 1
+          ELSE "RateLimitCounter"."count" + 1
+        END,
+        "resetAt" = CASE
+          WHEN "RateLimitCounter"."resetAt" <= ${now} THEN ${resetAt}
+          ELSE "RateLimitCounter"."resetAt"
+        END
+      RETURNING "count", "resetAt"
+    `;
+    const row = rows[0];
+    if (!row) {
+      throw new HttpException(
+        { code: "RATE_LIMIT_UNAVAILABLE", message: "Rate limit counter write failed." },
+        HttpStatus.SERVICE_UNAVAILABLE,
+      );
     }
-    if (row.count >= limit) {
+    if (row.count > limit) {
       throw new HttpException(
         {
           code: "RATE_LIMITED",
           message: "Too many requests for this route. Retry later.",
-          retryAfterMs: row.resetAt.getTime() - now.getTime(),
+          retryAfterMs: Math.max(0, row.resetAt.getTime() - now.getTime()),
         },
         HttpStatus.TOO_MANY_REQUESTS,
       );
     }
-    await this.prisma!.rateLimitCounter.update({
-      where: { key },
-      data: { count: { increment: 1 } },
-    });
   }
 }

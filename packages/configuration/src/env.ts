@@ -49,6 +49,12 @@ export const EnvSchema = z
     FACTUS_PAY_PRODUCTION_CLIENT_SECRET: z.string().optional().default(""),
     FACTUS_PAY_PRODUCTION_WEBHOOK_KEY: z.string().optional().default(""),
     /**
+     * Deprecated fallback: accept webhook secret via `?key=` query (log/Referer leak risk).
+     * Default false — prefer Authorization: Bearer or X-Factus-Pay-Webhook-Key.
+     * Only enable explicitly for legacy Factus provider configs that cannot send headers.
+     */
+    FACTUS_PAY_WEBHOOK_ALLOW_QUERY_KEY: boolFromEnv.default(false),
+    /**
      * When true, collection create is proxied to Central's managed Factus gateway path.
      * Central today keeps that gateway INTERNAL (managed custody) — not a public HTTP API.
      * Leave false unless Central publishes a commercial collection endpoint.

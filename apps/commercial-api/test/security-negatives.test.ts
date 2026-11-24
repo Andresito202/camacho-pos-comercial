@@ -317,6 +317,54 @@ describe("security negatives — trial, captcha, files", () => {
     expect(reused).toBe(1);
   });
 
+  it("rejects Factus webhook when secret only in query (default fail-closed)", async () => {
+    const key = process.env.FACTUS_PAY_SANDBOX_WEBHOOK_KEY!;
+    const res = await app.inject({
+      method: "POST",
+      url: `/v1/webhooks/factus-pay/collections?key=${encodeURIComponent(key)}`,
+      payload: {
+        data: {
+          reference_code: "CPC-PAY-NEG-QUERY",
+          amount: 100,
+          status: "paid",
+        },
+      },
+    });
+    expect(res.statusCode).toBe(401);
+    const body = res.json() as { code?: string; message?: { code?: string } };
+    expect(body.code ?? body.message?.code).toBe("FACTUS_PAY_UNAUTHORIZED");
+  });
+
+  it("accepts Factus webhook Authorization Bearer secret", async () => {
+    const key = process.env.FACTUS_PAY_SANDBOX_WEBHOOK_KEY!;
+    // Wrong key → unauthorized (proves header path is evaluated).
+    const bad = await app.inject({
+      method: "POST",
+      url: "/v1/webhooks/factus-pay/collections",
+      headers: { authorization: "Bearer wrong_key_wrong_key_wrong_key_xxx" },
+      payload: {
+        data: { reference_code: "x", amount: 1, status: "paid" },
+      },
+    });
+    expect(bad.statusCode).toBe(401);
+
+    const goodShape = await app.inject({
+      method: "POST",
+      url: "/v1/webhooks/factus-pay/collections",
+      headers: { authorization: `Bearer ${key}` },
+      payload: {
+        data: {
+          reference_code: "CPC-PAY-MISSING-REF",
+          amount: 100,
+          status: "paid",
+        },
+      },
+    });
+    // Auth OK; orphan reference → NOT_FOUND (not 401)
+    expect([200, 201]).toContain(goodShape.statusCode);
+    expect(goodShape.json().result).toBe("NOT_FOUND");
+  });
+
   it("refuses local activation without CENTRAL_TRIAL_WEBHOOK_KEY", async () => {
     captcha.verifyFn = async () => ({ success: true });
     const created = await app.inject({

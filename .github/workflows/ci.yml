@@ -63,6 +63,11 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      # SCA — fail-closed on critical production advisories. High/moderate tracked via Dependabot
+      # (no prior audit gate in this repo). Does not disable typecheck/lint/test.
+      - name: Dependency audit (prod, critical)
+        run: pnpm audit --prod --audit-level=critical
+
       - name: Prisma generate
         run: pnpm prisma:generate
 
