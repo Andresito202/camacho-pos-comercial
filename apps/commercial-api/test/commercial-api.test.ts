@@ -272,6 +272,87 @@ describe("commercial-api critical paths", () => {
 
     const payment = await prisma.payment.findUniqueOrThrow({ where: { referenceCode } });
     expect(payment.status).toBe("PAID");
+
+    // Central origin empty → order stays PAID, provisioning PENDING (PAID+PENDING_PROVISION)
+    const paidOrder = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
+    expect(paidOrder.status).toBe("PAID");
+    const provision = await prisma.provisioningRequest.findFirst({ where: { orderId: order.id } });
+    expect(provision?.status).toBe("PENDING");
+    expect(provision?.lastError).toBe("PENDING_CENTRAL_CREDENTIALS");
+  });
+
+  it("sandbox simulate paid does not call Central provision", async () => {
+    const originalFetch = globalThis.fetch;
+    let centralFetches = 0;
+    globalThis.fetch = (async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/v1/commercial/provisioning") || url.includes("central")) {
+        centralFetches += 1;
+      }
+      return originalFetch(input, init);
+    }) as typeof fetch;
+
+    try {
+      const customer = await prisma.commercialCustomer.upsert({
+        where: { email: "simulate-test@example.com" },
+        create: {
+          email: "simulate-test@example.com",
+          fullName: "Simulate Test",
+        },
+        update: {},
+      });
+      const order = await prisma.order.create({
+        data: {
+          orderNumber: `TEST-SIM-${Date.now()}`,
+          customerId: customer.id,
+          status: "PENDING_PAYMENT",
+          subtotalCents: 39900,
+          totalCents: 39900,
+          idempotencyKey: `idem-sim-${Date.now()}`,
+        },
+      });
+      const referenceCode = `CPC-PAY-SIM-${Date.now()}`;
+      await prisma.payment.create({
+        data: {
+          orderId: order.id,
+          customerId: customer.id,
+          provider: "SANDBOX_MOCK",
+          environment: "SANDBOX",
+          status: "PENDING",
+          amountCents: 39900,
+          referenceCode,
+        },
+      });
+
+      // Even if Central origin were set mid-test, simulate must not provision.
+      process.env.CENTRAL_AUTHORITY_ORIGIN = "https://central.example.test";
+
+      const res = await inject("POST", `/v1/payments/${referenceCode}/sandbox-simulate-paid`);
+      expect([200, 201]).toContain(res.statusCode);
+      const body = res.json() as { result: string; provisionedToCentral?: boolean };
+      expect(body.result).toBe("STORED");
+      expect(body.provisionedToCentral).toBe(false);
+
+      const payment = await prisma.payment.findUniqueOrThrow({ where: { referenceCode } });
+      expect(payment.status).toBe("PAID");
+      const paidOrder = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
+      expect(paidOrder.status).toBe("PAID");
+
+      const provision = await prisma.provisioningRequest.findFirst({ where: { orderId: order.id } });
+      expect(provision).toBeNull();
+      expect(centralFetches).toBe(0);
+
+      const audit = await prisma.auditLog.findFirst({
+        where: {
+          action: "SANDBOX_SIMULATE_PAID_NO_CENTRAL_PROVISION",
+          entityId: payment.id,
+        },
+      });
+      expect(audit).toBeTruthy();
+    } finally {
+      globalThis.fetch = originalFetch;
+      process.env.CENTRAL_AUTHORITY_ORIGIN = "";
+    }
   });
 
   it("unauthorized admin fails closed without Central credentials", async () => {

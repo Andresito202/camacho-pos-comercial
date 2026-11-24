@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import type { CartItem, Money } from "./types";
 
 const STORAGE_KEY = "camacho-pos-cart-v1";
+const SESSION_STORAGE_KEY = "camacho-pos-cart-session-v1";
+const SESSION_COOKIE = "camacho_cart_session";
 
 function read(): CartItem[] {
   if (typeof window === "undefined") return [];
@@ -20,6 +22,50 @@ function read(): CartItem[] {
 function write(items: CartItem[]) {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
   window.dispatchEvent(new Event("camacho-cart-changed"));
+}
+
+function readCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
+  const value = match?.[1];
+  return value ? decodeURIComponent(value) : null;
+}
+
+function writeSessionCookie(token: string | null) {
+  if (typeof document === "undefined") return;
+  if (!token) {
+    document.cookie = `${SESSION_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax`;
+    return;
+  }
+  // 7 days — mirrors localStorage cart session persistence for same-origin pages.
+  document.cookie = `${SESSION_COOKIE}=${encodeURIComponent(token)}; Path=/; Max-Age=604800; SameSite=Lax`;
+}
+
+/** Server cart session token (cookie + localStorage). Totals remain server-authoritative. */
+export function getCartSessionToken(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const fromStorage = window.localStorage.getItem(SESSION_STORAGE_KEY);
+    if (fromStorage && fromStorage.length >= 10) return fromStorage;
+  } catch {
+    /* ignore */
+  }
+  const fromCookie = readCookie(SESSION_COOKIE);
+  return fromCookie && fromCookie.length >= 10 ? fromCookie : null;
+}
+
+export function setCartSessionToken(token: string) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(SESSION_STORAGE_KEY, token);
+  writeSessionCookie(token);
+  window.dispatchEvent(new Event("camacho-cart-session-changed"));
+}
+
+export function clearCartSessionToken() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(SESSION_STORAGE_KEY);
+  writeSessionCookie(null);
+  window.dispatchEvent(new Event("camacho-cart-session-changed"));
 }
 
 export function getCartItems(): CartItem[] {
@@ -50,6 +96,7 @@ export function removeCartItem(id: string) {
 
 export function clearCart() {
   write([]);
+  clearCartSessionToken();
 }
 
 export function cartSubtotal(items: CartItem[]): Money {
@@ -81,5 +128,6 @@ export function useCart() {
     update: updateCartQuantity,
     remove: removeCartItem,
     clear: clearCart,
+    sessionToken: typeof window !== "undefined" ? getCartSessionToken() : null,
   };
 }

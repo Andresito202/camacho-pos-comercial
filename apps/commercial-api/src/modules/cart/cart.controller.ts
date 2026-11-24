@@ -1,14 +1,19 @@
-import { Inject, Body, Controller, Get, Param, Post } from "@nestjs/common";
+import { Inject, Body, Controller, Get, Param, Post, Req } from "@nestjs/common";
 import { ApplyCouponSchema, parseAddCartItem } from "@camacho-pos-comercial/contracts";
 import { parseOrBadRequest } from "../../common/parse-or-bad-request.js";
+import { RateLimitService } from "../../common/rate-limit/rate-limit.service.js";
 import { CartService } from "./cart.service.js";
 
 @Controller("cart")
 export class CartController {
-  constructor(@Inject(CartService) private readonly carts: CartService) {}
+  constructor(
+    @Inject(CartService) private readonly carts: CartService,
+    @Inject(RateLimitService) private readonly rateLimit: RateLimitService,
+  ) {}
 
   @Post()
-  create() {
+  create(@Req() req: { ip?: string }) {
+    this.rateLimit.assert(`cart:create:${req.ip ?? "unknown"}`, 60, 60_000);
     return this.carts.createCart();
   }
 
@@ -18,7 +23,12 @@ export class CartController {
   }
 
   @Post(":sessionToken/items")
-  addItem(@Param("sessionToken") sessionToken: string, @Body() body: unknown) {
+  addItem(
+    @Param("sessionToken") sessionToken: string,
+    @Body() body: unknown,
+    @Req() req: { ip?: string },
+  ) {
+    this.rateLimit.assert(`cart:items:${req.ip ?? "unknown"}`, 120, 60_000);
     const input = parseOrBadRequest(() => parseAddCartItem(body));
     return this.carts.addItem(sessionToken, input);
   }

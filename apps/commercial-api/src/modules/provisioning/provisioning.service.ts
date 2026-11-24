@@ -6,8 +6,15 @@ import { AppConfigService } from "../../config/config.service.js";
 import { AuditService } from "../audit/audit.service.js";
 
 /**
- * Outbox to Central for license provisioning.
- * Idempotent. Retries with nextRetryAt. Fail-closed when Central origin missing.
+ * ProvisioningRequest outbox → Central license issuance.
+ *
+ * Idempotent by orderId hash. When Central is unavailable:
+ * - Order remains PAID
+ * - ProvisioningRequest stays PENDING (PAID + PENDING_PROVISION)
+ * - Retries are stubbed via processDue + nextRetryAt backoff (documented)
+ *
+ * Central path today: `${CENTRAL_AUTHORITY_ORIGIN}${CENTRAL_PROVISIONING_PATH}`
+ * (default `/v1/commercial/provisioning`) — not yet a published Central route.
  */
 @Injectable()
 export class ProvisioningService {
@@ -54,36 +61,52 @@ export class ProvisioningService {
       })),
     };
 
+    const origin = this.config.centralOrigin();
     const request = await this.prisma.provisioningRequest.create({
       data: {
         orderId,
-        status: "QUEUED",
+        // PENDING when Central missing → order stays PAID (PAID + PENDING_PROVISION).
+        // QUEUED when Central origin present → worker may attempt send.
+        status: origin ? "QUEUED" : "PENDING",
         idempotencyKey,
         payload,
-        nextRetryAt: new Date(),
+        lastError: origin ? null : "PENDING_CENTRAL_CREDENTIALS",
+        nextRetryAt: new Date(Date.now() + (origin ? 0 : 60_000)),
       },
     });
 
-    await this.prisma.order.update({
-      where: { id: orderId },
-      data: { status: "PROVISIONING" },
-    });
+    if (origin) {
+      await this.prisma.order.update({
+        where: { id: orderId },
+        data: { status: "PROVISIONING" },
+      });
+    }
+    // else: leave Order.status = PAID (PAID + PENDING_PROVISION)
 
     await this.audit.record({
       actorType: "SYSTEM",
-      action: "PROVISIONING_ENQUEUED",
+      action: origin ? "PROVISIONING_ENQUEUED" : "PROVISIONING_PENDING_CENTRAL",
       entityType: "ProvisioningRequest",
       entityId: request.id,
-      metadata: { orderId, licenseUnits },
+      metadata: {
+        orderId,
+        licenseUnits,
+        orderStatus: origin ? "PROVISIONING" : "PAID",
+        provisioningStatus: request.status,
+      },
     });
 
     return request;
   }
 
+  /**
+   * Retry stub: claim due PENDING/QUEUED/FAILED rows and attempt Central POST.
+   * Exponential-ish backoff capped at 60 minutes. No silent success.
+   */
   async processDue(limit = 20) {
     const due = await this.prisma.provisioningRequest.findMany({
       where: {
-        status: { in: ["QUEUED", "FAILED"] },
+        status: { in: ["PENDING", "QUEUED", "FAILED"] },
         OR: [{ nextRetryAt: null }, { nextRetryAt: { lte: new Date() } }],
       },
       take: limit,
@@ -99,24 +122,27 @@ export class ProvisioningService {
 
   private async attemptSend(id: string) {
     const item = await this.prisma.provisioningRequest.findUniqueOrThrow({ where: { id } });
-    const origin = this.config.env.CENTRAL_AUTHORITY_ORIGIN?.trim();
+    const origin = this.config.centralOrigin();
 
     if (!origin) {
+      // Stay PENDING — order remains PAID. Documented retry stub: bump nextRetryAt only.
       await this.prisma.provisioningRequest.update({
         where: { id },
         data: {
-          status: "FAILED",
+          status: "PENDING",
           lastError: "PENDING_CENTRAL_CREDENTIALS",
           attemptCount: item.attemptCount + 1,
           nextRetryAt: new Date(Date.now() + 60_000 * Math.min(60, item.attemptCount + 1)),
         },
       });
-      this.logger.warn(`Provisioning ${id} blocked: PENDING_CENTRAL_CREDENTIALS`);
-      return { id, status: "FAILED" };
+      this.logger.warn(`Provisioning ${id} deferred: PENDING_CENTRAL_CREDENTIALS (order stays PAID)`);
+      return { id, status: "PENDING" };
     }
 
+    const path = this.config.env.CENTRAL_PROVISIONING_PATH || "/v1/commercial/provisioning";
+
     try {
-      const response = await fetch(`${origin}/v1/commercial/provisioning`, {
+      const response = await fetch(`${origin}${path}`, {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -153,6 +179,7 @@ export class ProvisioningService {
           nextRetryAt: new Date(Date.now() + 60_000 * Math.min(60, item.attemptCount + 1)),
         },
       });
+      // Order may already be PROVISIONING; leave it — do not silently mark FULFILLED.
       return { id, status: "FAILED" };
     }
   }

@@ -6,9 +6,11 @@ Prevent accidental commit of API keys, webhook secrets, database passwords, and 
 
 ## Repository hygiene
 
-- `.env`, `.env.local`, and similar files are gitignored.
+- `.env`, `.env.local`, and similar files are gitignored (`git check-ignore` → `.env`).
+- `.env` is **not** tracked (`git ls-files` must not list it). Only `.env.example` may be committed.
 - `.env.example` contains **names and empty/placeholder values only** — never real credentials.
 - Production webhook keys must be long random strings (≥ 32 chars when production mode is enabled).
+- Local scan (Phase 3): no `sk_live`, `whsec_`, or PEM private keys found in tracked sources; rotate if any appear.
 
 ## Recommended automation (when GitHub remote exists)
 

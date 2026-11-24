@@ -16,18 +16,38 @@ export const EnvSchema = z
 
     CENTRAL_AUTHORITY_ORIGIN: z.string().url().optional().or(z.literal("")),
     CENTRAL_SESSION_BRIDGE_ENABLED: boolFromEnv.default(false),
+    /** Path commercial-api POSTs license outbox payloads to Central. Stub until Central exposes it. */
+    CENTRAL_PROVISIONING_PATH: z.string().default("/v1/commercial/provisioning"),
 
+    /**
+     * Configured environment intent. Resolved runtime gate is MOCK | SANDBOX | PRODUCTION
+     * via `resolveFactusPayGate` (MOCK = sandbox without credentials, non-production only).
+     */
     FACTUS_PAY_MODE: z.enum(["SANDBOX", "PRODUCTION"]).default("SANDBOX"),
     FACTUS_PAY_SANDBOX_ENABLED: boolFromEnv.default(true),
+    /** Hard kill-switch for real PRODUCTION charges. Default false — keep production charges disabled. */
     FACTUS_PAY_PRODUCTION_ENABLED: boolFromEnv.default(false),
     FACTUS_PAY_SANDBOX_BASE_URL: z.string().url().default("https://pay-api-sandbox.factus.com.co"),
     FACTUS_PAY_PRODUCTION_BASE_URL: z.string().url().default("https://pay-api.factus.com.co"),
+    /**
+     * Official Factus Pay auth uses email + password (POST /auth).
+     * CLIENT_ID / CLIENT_SECRET remain as aliases for the same values (historical naming).
+     */
+    FACTUS_PAY_SANDBOX_EMAIL: z.string().optional().default(""),
+    FACTUS_PAY_SANDBOX_PASSWORD: z.string().optional().default(""),
     FACTUS_PAY_SANDBOX_CLIENT_ID: z.string().optional().default(""),
     FACTUS_PAY_SANDBOX_CLIENT_SECRET: z.string().optional().default(""),
     FACTUS_PAY_SANDBOX_WEBHOOK_KEY: z.string().optional().default(""),
+    FACTUS_PAY_PRODUCTION_EMAIL: z.string().optional().default(""),
+    FACTUS_PAY_PRODUCTION_PASSWORD: z.string().optional().default(""),
     FACTUS_PAY_PRODUCTION_CLIENT_ID: z.string().optional().default(""),
     FACTUS_PAY_PRODUCTION_CLIENT_SECRET: z.string().optional().default(""),
     FACTUS_PAY_PRODUCTION_WEBHOOK_KEY: z.string().optional().default(""),
+    /**
+     * When true, collection create is proxied to Central's managed Factus gateway path.
+     * Central today keeps that gateway INTERNAL (managed custody) — not a public HTTP API.
+     * Leave false unless Central publishes a commercial collection endpoint.
+     */
     FACTUS_PAY_USE_CENTRAL_GATEWAY: boolFromEnv.default(false),
     CENTRAL_FACTUS_PAY_GATEWAY_PATH: z.string().default("/v1/subscriptions/factus-pay/collections"),
 
@@ -59,11 +79,14 @@ export const EnvSchema = z
         });
       }
       if (env.FACTUS_PAY_MODE === "PRODUCTION") {
-        if (!env.FACTUS_PAY_PRODUCTION_CLIENT_ID || !env.FACTUS_PAY_PRODUCTION_CLIENT_SECRET) {
+        const email = resolveFactusEmail(env, "PRODUCTION");
+        const password = resolveFactusPassword(env, "PRODUCTION");
+        if (!email || !password) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
-            message: "PRODUCTION Factus Pay credentials required when NODE_ENV=production and mode=PRODUCTION",
-            path: ["FACTUS_PAY_PRODUCTION_CLIENT_ID"],
+            message:
+              "PRODUCTION Factus Pay credentials required (EMAIL/PASSWORD or CLIENT_ID/CLIENT_SECRET aliases)",
+            path: ["FACTUS_PAY_PRODUCTION_EMAIL"],
           });
         }
         if (!env.FACTUS_PAY_PRODUCTION_WEBHOOK_KEY || env.FACTUS_PAY_PRODUCTION_WEBHOOK_KEY.length < 32) {
@@ -86,17 +109,52 @@ export const EnvSchema = z
 
 export type AppEnv = z.infer<typeof EnvSchema>;
 
+/** Runtime gate labels for adapters, logs, and docs. */
+export type FactusPayGate = "MOCK" | "SANDBOX" | "PRODUCTION";
+
 export function loadEnv(source: Record<string, string | undefined> = process.env): AppEnv {
   return EnvSchema.parse(source);
+}
+
+export function resolveFactusEmail(env: AppEnv, mode: "SANDBOX" | "PRODUCTION"): string {
+  if (mode === "PRODUCTION") {
+    return (env.FACTUS_PAY_PRODUCTION_EMAIL || env.FACTUS_PAY_PRODUCTION_CLIENT_ID || "").trim();
+  }
+  return (env.FACTUS_PAY_SANDBOX_EMAIL || env.FACTUS_PAY_SANDBOX_CLIENT_ID || "").trim();
+}
+
+export function resolveFactusPassword(env: AppEnv, mode: "SANDBOX" | "PRODUCTION"): string {
+  if (mode === "PRODUCTION") {
+    return (env.FACTUS_PAY_PRODUCTION_PASSWORD || env.FACTUS_PAY_PRODUCTION_CLIENT_SECRET || "").trim();
+  }
+  return (env.FACTUS_PAY_SANDBOX_PASSWORD || env.FACTUS_PAY_SANDBOX_CLIENT_SECRET || "").trim();
+}
+
+export function hasFactusCredentials(env: AppEnv, mode: "SANDBOX" | "PRODUCTION"): boolean {
+  return Boolean(resolveFactusEmail(env, mode) && resolveFactusPassword(env, mode));
+}
+
+/**
+ * MOCK — labeled local simulator (no provider HTTP). Never allowed when NODE_ENV=production.
+ * SANDBOX — real Factus sandbox HTTP with credentials.
+ * PRODUCTION — real Factus production; requires FACTUS_PAY_PRODUCTION_ENABLED=true.
+ */
+export function resolveFactusPayGate(env: AppEnv): FactusPayGate {
+  if (env.FACTUS_PAY_MODE === "PRODUCTION") {
+    if (!env.FACTUS_PAY_PRODUCTION_ENABLED) {
+      throw new Error("FACTUS_PAY_PRODUCTION_DISABLED");
+    }
+    return "PRODUCTION";
+  }
+  if (isFactusSandboxMockAllowed(env)) return "MOCK";
+  return "SANDBOX";
 }
 
 export function isFactusSandboxMockAllowed(env: AppEnv): boolean {
   if (env.NODE_ENV === "production") return false;
   if (env.FACTUS_PAY_MODE !== "SANDBOX") return false;
-  const hasCreds =
-    Boolean(env.FACTUS_PAY_SANDBOX_CLIENT_ID) && Boolean(env.FACTUS_PAY_SANDBOX_CLIENT_SECRET);
-  // Mock only when credentials missing and not production.
-  return !hasCreds && env.FACTUS_PAY_SANDBOX_ENABLED;
+  // Mock only when credentials missing and sandbox enabled.
+  return !hasFactusCredentials(env, "SANDBOX") && env.FACTUS_PAY_SANDBOX_ENABLED;
 }
 
 export function resolveWebhookKey(env: AppEnv): string | null {
@@ -104,4 +162,9 @@ export function resolveWebhookKey(env: AppEnv): string | null {
     return env.FACTUS_PAY_PRODUCTION_WEBHOOK_KEY || null;
   }
   return env.FACTUS_PAY_SANDBOX_WEBHOOK_KEY || null;
+}
+
+export function resolveCentralOrigin(env: AppEnv): string | null {
+  const origin = env.CENTRAL_AUTHORITY_ORIGIN?.trim();
+  return origin ? origin : null;
 }

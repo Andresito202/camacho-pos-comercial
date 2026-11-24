@@ -53,6 +53,7 @@ export class PaymentsService {
             status: "SUBMITTED",
             providerPayload: {
               mock: collection.mock,
+              gate: collection.gate,
               status: collection.status,
               label: collection.mock ? "SANDBOX_MOCK_LABELED" : "PROVIDER",
             },
@@ -67,6 +68,7 @@ export class PaymentsService {
   /**
    * Webhook: POST /v1/webhooks/factus-pay/collections
    * Idempotent. Verify amount + reference. Never mark paid from frontend alone.
+   * Real paid → may enqueue Central provisioning (stays PAID+PENDING when Central down).
    */
   async handleFactusPayWebhook(input: {
     body: unknown;
@@ -135,6 +137,8 @@ export class PaymentsService {
       });
     }
 
+    const wasUnpaid = payment.status !== "PAID";
+
     await this.prisma.$transaction(async (tx) => {
       await tx.paymentEvent.create({
         data: {
@@ -150,7 +154,7 @@ export class PaymentsService {
         },
       });
 
-      if (payment.status !== "PAID") {
+      if (wasUnpaid) {
         await tx.payment.update({
           where: { id: payment.id },
           data: { status: "PAID", paidAt: new Date() },
@@ -171,7 +175,9 @@ export class PaymentsService {
       }
     });
 
-    if (payment.status !== "PAID") {
+    if (wasUnpaid) {
+      // Real webhook may enqueue Central outbox. When Central is unavailable the
+      // order stays PAID and ProvisioningRequest stays PENDING (see provisioning).
       await this.provisioning.enqueueForPaidOrder(payment.orderId);
       await this.audit.record({
         actorType: "WEBHOOK",
@@ -185,24 +191,86 @@ export class PaymentsService {
     return { result: "STORED" };
   }
 
-  /** Sandbox-only reconcile helper for tests — never trusts frontend paid claims. */
+  /**
+   * Sandbox/MOCK-only reconcile helper for tests and local demos.
+   * Marks PAID via the same amount/reference checks as webhook, but MUST NOT
+   * enqueue real license provisioning to Central (no outbox send / no fetch).
+   */
   async sandboxSimulatePaid(referenceCode: string) {
     if (this.config.isProduction) {
       throw new BadRequestException({ code: "SANDBOX_ONLY" });
     }
+
     const payment = await this.prisma.payment.findUniqueOrThrow({
       where: { referenceCode },
+      include: { order: true },
     });
-    return this.handleFactusPayWebhook({
-      suppliedKey: this.config.webhookKey(),
-      body: {
+
+    const amountCents = payment.amountCents;
+    const idempotencyKey = createHash("sha256")
+      .update(`sandbox-simulate:${referenceCode}:${amountCents}:paid`)
+      .digest("hex");
+
+    const existingEvent = await this.prisma.paymentEvent.findUnique({
+      where: { idempotencyKey },
+    });
+    if (existingEvent) {
+      return { result: "DUPLICATE" as WebhookProcessResult, provisionedToCentral: false };
+    }
+
+    const wasUnpaid = payment.status !== "PAID";
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.paymentEvent.create({
         data: {
-          reference_code: referenceCode,
-          amount: payment.amountCents,
-          status: "paid",
+          paymentId: payment.id,
+          idempotencyKey,
+          provider: payment.provider,
+          environment: payment.environment,
+          eventType: "collection.paid.sandbox_simulate",
+          referenceCode,
+          amountCents,
+          rawPayload: {
+            source: "SANDBOX_SIMULATE",
+            note: "Does not trigger Central license provisioning",
+          },
+          processedAt: new Date(),
         },
-      },
+      });
+
+      if (wasUnpaid) {
+        await tx.payment.update({
+          where: { id: payment.id },
+          data: { status: "PAID", paidAt: new Date() },
+        });
+        await tx.paymentAttempt.create({
+          data: { paymentId: payment.id, status: "SUCCEEDED" },
+        });
+        await tx.order.update({
+          where: { id: payment.orderId },
+          data: { status: "PAID", paidAt: new Date() },
+        });
+        if (payment.order.cartId) {
+          await tx.cart.update({
+            where: { id: payment.order.cartId },
+            data: { status: "CONVERTED" },
+          });
+        }
+      }
     });
+
+    if (wasUnpaid) {
+      await this.audit.record({
+        actorType: "SYSTEM",
+        action: "SANDBOX_SIMULATE_PAID_NO_CENTRAL_PROVISION",
+        entityType: "Payment",
+        entityId: payment.id,
+        metadata: { referenceCode, amountCents, provisionedToCentral: false },
+      });
+    }
+
+    // Explicit: never call provisioning.enqueueForPaidOrder / never fetch Central.
+    return { result: "STORED" as WebhookProcessResult, provisionedToCentral: false };
   }
 }
 

@@ -333,17 +333,32 @@ function mapPlan(plan: ApiPlan): Plan {
   };
 }
 
+/** Strip internal staging jargon from merchant-facing catalog copy. */
+function scrubMerchantCopy(text: string): string {
+  return text
+    .replace(/\bPrecio DRAFT\b[^.]*\.?/gi, "")
+    .replace(/\bprecios DRAFT\b[^.]*\.?/gi, "")
+    .replace(/\bprecio provisional DRAFT\b[^.]*\.?/gi, "")
+    .replace(/\bDRAFT\b/g, "")
+    .replace(/\bElectron POS\b/gi, "caja en Windows")
+    .replace(/\bElectron\b/g, "Windows")
+    .replace(/\s{2,}/g, " ")
+    .replace(/\s+\./g, ".")
+    .trim();
+}
+
 function mapProduct(product: ApiProduct): Equipment {
   const variant =
     product.variants?.find((v) => v.publicationStatus === "PUBLISHED") ?? product.variants?.[0];
   const imageFromApi = product.images?.[0]?.url;
+  const description = scrubMerchantCopy(product.description);
   return {
     id: product.id,
     slug: product.slug,
     name: product.name,
     category: product.category?.name ?? product.category?.slug ?? product.kind ?? "Equipo",
-    summary: product.description.slice(0, 160),
-    description: product.description,
+    summary: description.slice(0, 160),
+    description,
     price: { amountCents: variant?.amountCents ?? 0, currency: "COP" },
     image: imageFromApi || `/images/hardware/${guessHardwareImage(product.slug, product.category?.slug)}`,
     status: mapFeatureStatus(product.publicationStatus),
@@ -356,18 +371,19 @@ function mapProduct(product: ApiProduct): Equipment {
 }
 
 function mapKit(kit: ApiKit): Equipment {
+  const description = scrubMerchantCopy(kit.description);
   return {
     id: kit.id,
     slug: kit.slug,
     name: kit.name,
     category: "Kit",
-    summary: kit.description.slice(0, 160),
-    description: kit.description,
+    summary: description.slice(0, 160),
+    description,
     price: { amountCents: kit.amountCents, currency: "COP" },
     image: "/images/hardware/terminal-tactil.svg",
     status: mapFeatureStatus(kit.publicationStatus),
     featured: kit.publicationStatus === "PUBLISHED" || kit.publicationStatus === "DRAFT",
-    specs: ["Kit comercial", `slug:${kit.slug}`],
+    specs: ["Kit comercial"],
     kitId: kit.id,
     priceVersion: kit.priceVersion,
   };
@@ -579,6 +595,8 @@ export async function buildWhatsAppMessage(input: {
   intent: string;
   planId?: string;
   planSlug?: string;
+  modality?: "MONTHLY" | "ANNUAL" | "PERPETUAL";
+  priceLabel?: string;
   equipmentIds?: string[];
   city?: string;
   note?: string;
@@ -587,6 +605,9 @@ export async function buildWhatsAppMessage(input: {
     method: "POST",
     body: JSON.stringify({
       planSlug: input.planSlug,
+      planId: input.planId,
+      modality: input.modality,
+      priceLabel: input.priceLabel,
       utmSource: input.intent.slice(0, 40),
     }),
     cache: "no-store",
@@ -594,10 +615,15 @@ export async function buildWhatsAppMessage(input: {
   if (data?.url) return { url: data.url, message: data.text, source: "api" };
 
   const settings = draftSettings;
+  const modalityLabel =
+    input.modality === "ANNUAL" ? "Anual" : input.modality === "PERPETUAL" ? "Pago único" : input.modality === "MONTHLY" ? "Mensual" : null;
   const lines = [
     "Hola, quiero información de Camacho POS Colombia.",
     `Intención: ${input.intent}`,
-    input.planSlug || input.planId ? `Plan: ${input.planSlug ?? input.planId}` : null,
+    input.planSlug ? `Plan: ${input.planSlug}` : null,
+    input.planId ? `Id: ${input.planId}` : null,
+    modalityLabel ? `Modalidad: ${modalityLabel}` : null,
+    input.priceLabel ? `Precio: ${input.priceLabel}` : null,
     input.equipmentIds?.length ? `Equipos: ${input.equipmentIds.join(", ")}` : null,
     input.city ? `Ciudad: ${input.city}` : null,
     input.note ? `Nota: ${input.note}` : null,
@@ -756,13 +782,41 @@ function cartItemToApiPayload(item: CartItem): Record<string, unknown> | null {
   return null;
 }
 
+/**
+ * Ensure a server cart session exists. Reuses cookie/localStorage token when still OPEN.
+ * Server remains sole authority for totals; client never sends totals.
+ */
+async function ensureServerCartSession(): Promise<string | null> {
+  const { getCartSessionToken, setCartSessionToken, clearCartSessionToken } = await import(
+    "./cart-store"
+  );
+  const existing = getCartSessionToken();
+  if (existing) {
+    const probe = await apiFetchRaw(`/v1/cart/${existing}`, { method: "GET", cache: "no-store" });
+    if (probe.ok) {
+      const view = probe.body as ApiCart | null;
+      if (view?.sessionToken && (view.status === "OPEN" || view.status === "CHECKOUT")) {
+        return view.sessionToken;
+      }
+    }
+    clearCartSessionToken();
+  }
+
+  const cartRes = await apiFetchRaw("/v1/cart", { method: "POST", cache: "no-store" });
+  const cart = cartRes.body as ApiCart | null;
+  if (!cartRes.ok || !cart?.sessionToken) return null;
+  setCartSessionToken(cart.sessionToken);
+  return cart.sessionToken;
+}
+
 export async function createCheckout(input: {
   items: CartItem[];
   customer: Record<string, string>;
 }): Promise<{ id: string; status: CheckoutStatus; source: ApiSource } | null> {
-  const cartRes = await apiFetchRaw("/v1/cart", { method: "POST", cache: "no-store" });
-  const cart = cartRes.body as ApiCart | null;
-  if (!cartRes.ok || !cart?.sessionToken) {
+  const { clearCartSessionToken, clearCart } = await import("./cart-store");
+
+  const sessionToken = await ensureServerCartSession();
+  if (!sessionToken) {
     if (!isDevelopment()) return null;
     return { id: `draft-chk-${Date.now()}`, status: "pendiente", source: "draft" };
   }
@@ -773,7 +827,7 @@ export async function createCheckout(input: {
       if (!isDevelopment()) return null;
       return { id: `draft-chk-${Date.now()}`, status: "pendiente", source: "draft" };
     }
-    const addRes = await apiFetchRaw(`/v1/cart/${cart.sessionToken}/items`, {
+    const addRes = await apiFetchRaw(`/v1/cart/${sessionToken}/items`, {
       method: "POST",
       body: JSON.stringify(payload),
       cache: "no-store",
@@ -788,7 +842,7 @@ export async function createCheckout(input: {
   const checkoutRes = await apiFetchRaw("/v1/checkout", {
     method: "POST",
     body: JSON.stringify({
-      cartSessionToken: cart.sessionToken,
+      cartSessionToken: sessionToken,
       idempotencyKey,
       customer: {
         fullName: input.customer.businessName || input.customer.fullName || "Cliente",
@@ -806,16 +860,12 @@ export async function createCheckout(input: {
   });
 
   const data = checkoutRes.body as ApiCheckout | null;
-  if (checkoutRes.ok && data?.paymentReference) {
+  if (checkoutRes.ok && (data?.paymentReference || data?.id)) {
+    // Cart converted / in checkout — drop session so a new open cart is created next time.
+    clearCartSessionToken();
+    clearCart();
     return {
-      id: data.paymentReference,
-      status: mapPaymentStatus(data.status),
-      source: "api",
-    };
-  }
-  if (checkoutRes.ok && data?.id) {
-    return {
-      id: data.id,
+      id: data.paymentReference ?? data.id,
       status: mapPaymentStatus(data.status),
       source: "api",
     };
