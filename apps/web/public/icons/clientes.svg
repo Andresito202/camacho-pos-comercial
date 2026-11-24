@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-label="Clientes">
+  <circle cx="26" cy="22" r="8" stroke="#101C2D" stroke-width="2.5"/>
+  <path d="M10 50c2.5-10 10-14 16-14s13.5 4 16 14" stroke="#101C2D" stroke-width="2.5" stroke-linecap="round"/>
+  <circle cx="46" cy="24" r="6" stroke="#168177" stroke-width="2.5"/>
+  <path d="M42 50c1-6 5-9 10-10" stroke="#168177" stroke-width="2.5" stroke-linecap="round"/>
+</svg>

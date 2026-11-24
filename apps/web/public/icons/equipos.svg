@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-label="Equipos">
+  <rect x="10" y="14" width="34" height="26" rx="3" stroke="#101C2D" stroke-width="2.5"/>
+  <path d="M18 48h18" stroke="#101C2D" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M27 40v8" stroke="#101C2D" stroke-width="2.5"/>
+  <rect x="38" y="30" width="16" height="18" rx="2" fill="#F7C83C" stroke="#101C2D" stroke-width="2"/>
+  <path d="M42 36h8M42 41h8" stroke="#25425A" stroke-width="2" stroke-linecap="round"/>
+</svg>

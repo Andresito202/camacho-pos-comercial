@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-label="Facturación">
+  <path d="M18 10h22l10 10v34a4 4 0 0 1-4 4H18a4 4 0 0 1-4-4V14a4 4 0 0 1 4-4Z" stroke="#101C2D" stroke-width="2.5"/>
+  <path d="M40 10v10h10" stroke="#101C2D" stroke-width="2.5"/>
+  <path d="M22 30h20M22 38h16M22 46h12" stroke="#25425A" stroke-width="2.5" stroke-linecap="round"/>
+  <rect x="42" y="40" width="10" height="8" rx="1.5" fill="#F7C83C"/>
+</svg>

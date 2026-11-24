@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420" role="img" aria-label="Composición cajón monedero">
+  <rect width="640" height="420" fill="#E8EEF1"/>
+  <rect x="120" y="150" width="400" height="160" rx="14" fill="#101C2D"/>
+  <rect x="140" y="170" width="360" height="100" rx="10" fill="#25425A"/>
+  <rect x="160" y="190" width="80" height="50" rx="6" fill="#F7C83C"/>
+  <rect x="260" y="190" width="80" height="50" rx="6" fill="#F6F5F0"/>
+  <rect x="360" y="190" width="120" height="50" rx="6" fill="#168177"/>
+  <text x="40" y="48" fill="#101C2D" font-family="Georgia, serif" font-size="22">Cajón monedero — ilustración</text>
+</svg>

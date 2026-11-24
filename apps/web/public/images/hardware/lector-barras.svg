@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420" role="img" aria-label="Composición lector de barras">
+  <rect width="640" height="420" fill="#EEF3F2"/>
+  <rect x="250" y="90" width="140" height="220" rx="28" fill="#101C2D"/>
+  <rect x="270" y="110" width="100" height="70" rx="12" fill="#168177"/>
+  <rect x="285" y="210" width="70" height="70" rx="10" fill="#25425A"/>
+  <path d="M300 320c20 40 40 40 60 0" stroke="#F7C83C" stroke-width="8" fill="none"/>
+  <text x="40" y="48" fill="#101C2D" font-family="Georgia, serif" font-size="22">Lector de código de barras — ilustración</text>
+</svg>

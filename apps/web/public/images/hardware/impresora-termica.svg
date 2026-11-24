@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420" role="img" aria-label="Composición impresora térmica">
+  <rect width="640" height="420" fill="#F6F5F0"/>
+  <rect x="180" y="140" width="280" height="160" rx="18" fill="#101C2D"/>
+  <rect x="200" y="160" width="240" height="50" rx="8" fill="#25425A"/>
+  <rect x="230" y="80" width="180" height="90" rx="8" fill="#FFF" stroke="#D7D2C6"/>
+  <path d="M240 100h160M240 118h140M240 136h120" stroke="#526070" stroke-width="4"/>
+  <circle cx="220" cy="260" r="8" fill="#F7C83C"/>
+  <text x="40" y="48" fill="#101C2D" font-family="Georgia, serif" font-size="22">Impresora térmica 80 mm — ilustración</text>
+</svg>

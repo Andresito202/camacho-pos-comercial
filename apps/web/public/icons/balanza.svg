@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-label="Balanza">
+  <path d="M32 12v36" stroke="#101C2D" stroke-width="2.5"/>
+  <path d="M18 52h28" stroke="#101C2D" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M14 24h36" stroke="#101C2D" stroke-width="2.5"/>
+  <path d="M20 24 14 38h12L20 24Zm24 0-6 14h12L44 24Z" fill="#F7C83C" stroke="#101C2D" stroke-width="2"/>
+  <circle cx="32" cy="24" r="3" fill="#168177"/>
+</svg>

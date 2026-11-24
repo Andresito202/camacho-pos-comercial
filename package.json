@@ -1,0 +1,25 @@
+{
+  "name": "camacho-pos-comercial",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Camacho POS Colombia — commercial portal API and related packages",
+  "packageManager": "pnpm@10.33.4",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "pnpm -r --filter @camacho-pos-comercial/contracts --filter @camacho-pos-comercial/configuration --filter @camacho-pos-comercial/database --filter @camacho-pos-comercial/commercial-api run build",
+    "start:dev": "pnpm --filter @camacho-pos-comercial/commercial-api start:dev",
+    "test": "pnpm -r --filter @camacho-pos-comercial/commercial-api --filter @camacho-pos-comercial/contracts run test",
+    "prisma:generate": "pnpm --filter @camacho-pos-comercial/database prisma:generate",
+    "prisma:migrate": "pnpm --filter @camacho-pos-comercial/database prisma:migrate",
+    "prisma:migrate:deploy": "pnpm --filter @camacho-pos-comercial/database prisma:migrate:deploy",
+    "prisma:seed": "pnpm --filter @camacho-pos-comercial/database prisma:seed",
+    "db:setup": "pnpm prisma:migrate:deploy && pnpm prisma:seed",
+    "typecheck": "pnpm -r run typecheck"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  }
+}

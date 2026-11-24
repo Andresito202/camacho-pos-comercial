@@ -1,0 +1,99 @@
+@import "tailwindcss";
+@import "@camacho-pos/ui/styles.css";
+
+@theme {
+  --color-navy: var(--navy);
+  --color-yellow: var(--yellow);
+  --color-steel: var(--steel);
+  --color-ivory: var(--ivory);
+  --color-teal: var(--teal);
+  --color-muted: var(--muted);
+  --font-sans: var(--font-dm-sans), "DM Sans", sans-serif;
+  --font-serif: var(--font-source-serif), "Source Serif 4", serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(1200px 500px at 10% -10%, color-mix(in srgb, var(--yellow) 18%, transparent), transparent 60%),
+    radial-gradient(900px 420px at 90% 0%, color-mix(in srgb, var(--teal) 12%, transparent), transparent 55%),
+    linear-gradient(180deg, #fbfaf6 0%, var(--ivory) 45%, #f3f1ea 100%);
+  color: var(--navy);
+  font-family: var(--font-sans);
+}
+
+::selection {
+  background: color-mix(in srgb, var(--yellow) 55%, white);
+  color: var(--navy);
+}
+
+a {
+  color: inherit;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+}
+
+.font-serif {
+  font-family: var(--font-serif);
+}
+
+.editorial-grid {
+  display: grid;
+  gap: 2rem;
+}
+
+@media (min-width: 900px) {
+  .editorial-grid {
+    grid-template-columns: 1.15fr 0.85fr;
+    align-items: end;
+  }
+}
+
+.reveal {
+  animation: rise 700ms ease both;
+}
+
+.reveal-delay {
+  animation: rise 900ms ease both;
+  animation-delay: 120ms;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes drift {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-8px);
+  }
+}
+
+.float-soft {
+  animation: drift 4.5s ease-in-out infinite alternate;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .reveal,
+  .reveal-delay,
+  .float-soft {
+    animation: none;
+  }
+}

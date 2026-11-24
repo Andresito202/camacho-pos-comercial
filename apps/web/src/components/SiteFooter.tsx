@@ -1,0 +1,74 @@
+import Link from "next/link";
+import Image from "next/image";
+
+const COLUMNS = [
+  {
+    title: "Producto",
+    links: [
+      { href: "/software-pos", label: "Software POS" },
+      { href: "/planes", label: "Planes" },
+      { href: "/equipos", label: "Equipos" },
+      { href: "/descargas", label: "Descargas" },
+    ],
+  },
+  {
+    title: "Comercial",
+    links: [
+      { href: "/contratar", label: "Contratar" },
+      { href: "/promociones", label: "Promociones" },
+      { href: "/cobertura", label: "Cobertura" },
+      { href: "/solicitar-demo", label: "Solicitar demo" },
+    ],
+  },
+  {
+    title: "Empresa",
+    links: [
+      { href: "/nosotros", label: "Nosotros" },
+      { href: "/blog", label: "Blog" },
+      { href: "/contacto", label: "Contacto" },
+      { href: "/soporte", label: "Soporte" },
+    ],
+  },
+  {
+    title: "Legal",
+    links: [
+      { href: "/legal/privacidad", label: "Privacidad" },
+      { href: "/legal/terminos", label: "Términos" },
+      { href: "/legal/tratamiento-de-datos", label: "Tratamiento de datos" },
+      { href: "/preguntas-frecuentes", label: "Preguntas frecuentes" },
+    ],
+  },
+];
+
+export function SiteFooter() {
+  return (
+    <footer className="mt-auto border-t border-[var(--border)] bg-[var(--navy)] text-[var(--ivory)]">
+      <div className="mx-auto grid max-w-6xl gap-10 px-4 py-14 sm:px-6 md:grid-cols-[1.2fr_repeat(4,1fr)] lg:px-8">
+        <div>
+          <Image src="/brand/logo-stacked.png" alt="Camacho POS Colombia" width={120} height={120} className="mb-4 rounded-lg bg-white/5 p-2" />
+          <p className="font-serif text-2xl">Camacho POS Colombia</p>
+          <p className="mt-3 max-w-xs text-sm text-white/70">
+            Contabilidad y precisión siempre. Software local-first y kits de hardware para el comercio colombiano.
+          </p>
+        </div>
+        {COLUMNS.map((column) => (
+          <div key={column.title}>
+            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--yellow)]">{column.title}</p>
+            <ul className="space-y-2 text-sm text-white/80">
+              {column.links.map((link) => (
+                <li key={link.href}>
+                  <Link href={link.href} className="hover:text-white">
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+      <div className="border-t border-white/10 px-4 py-4 text-center text-xs text-white/55 sm:px-6">
+        © {new Date().getFullYear()} Camacho POS Colombia. Todos los derechos reservados.
+      </div>
+    </footer>
+  );
+}

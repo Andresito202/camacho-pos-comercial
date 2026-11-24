@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 600" role="img" aria-label="Presentación interfaz POS">
+  <rect width="960" height="600" rx="24" fill="#101C2D"/>
+  <rect x="24" y="24" width="912" height="552" rx="16" fill="#F6F5F0"/>
+  <rect x="24" y="24" width="912" height="64" rx="16" fill="#25425A"/>
+  <text x="48" y="64" fill="#F6F5F0" font-family="Georgia, serif" font-size="28">Camacho POS — vista ilustrada de caja</text>
+  <rect x="48" y="120" width="180" height="120" rx="12" fill="#F7C83C"/>
+  <rect x="248" y="120" width="180" height="120" rx="12" fill="#D9E3EA"/>
+  <rect x="448" y="120" width="180" height="120" rx="12" fill="#D9E3EA"/>
+  <rect x="648" y="120" width="240" height="400" rx="12" fill="#101C2D"/>
+  <rect x="672" y="150" width="192" height="18" rx="9" fill="#F7C83C"/>
+  <rect x="672" y="190" width="192" height="12" rx="6" fill="#F6F5F0" opacity=".5"/>
+  <rect x="672" y="220" width="192" height="12" rx="6" fill="#F6F5F0" opacity=".5"/>
+  <rect x="672" y="250" width="192" height="12" rx="6" fill="#F6F5F0" opacity=".5"/>
+  <rect x="672" y="460" width="192" height="40" rx="10" fill="#168177"/>
+  <rect x="48" y="260" width="180" height="120" rx="12" fill="#D9E3EA"/>
+  <rect x="248" y="260" width="180" height="120" rx="12" fill="#168177" opacity=".35"/>
+  <rect x="448" y="260" width="180" height="120" rx="12" fill="#D9E3EA"/>
+  <text x="48" y="560" fill="#526070" font-family="Arial, sans-serif" font-size="16">Composición SVG editorial — no captura de producción</text>
+</svg>

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" role="img" aria-label="Composición sector tiendas">
+  <rect width="800" height="500" fill="#F6F5F0"/>
+  <path d="M0 360c120-40 220 20 340-10s220-30 460 20v130H0Z" fill="#F7C83C" opacity=".25"/>
+  <rect x="80" y="120" width="280" height="180" rx="18" fill="#101C2D"/>
+  <rect x="100" y="140" width="240" height="120" rx="10" fill="#F6F5F0"/>
+  <rect x="420" y="150" width="260" height="200" rx="18" fill="#25425A"/>
+  <circle cx="550" cy="250" r="48" fill="#F7C83C"/>
+  <text x="80" y="70" fill="#101C2D" font-family="Georgia, serif" font-size="28">Mostrador de tienda</text>
+  <text x="80" y="460" fill="#526070" font-family="Arial, sans-serif" font-size="16">Ilustración sectorial — no es fotografía de producto</text>
+</svg>
