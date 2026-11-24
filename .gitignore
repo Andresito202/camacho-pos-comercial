@@ -7,6 +7,7 @@ build
 coverage
 .turbo
 .DS_Store
+*.tsbuildinfo
 apps/commercial-api/dist
 packages/*/dist
 packages/database/prisma/generated
