@@ -42,7 +42,7 @@ Resolved by `resolveFactusPayGate` in `@camacho-pos-comercial/configuration`:
 | Create collection | `POST /v1/collections` | `{ reference_code, amount, expiration }` — amount in COP pesos; `expiration` in seconds. |
 | Get collection | `GET /v1/collections/:referenceCode` | Detail + QR |
 | List collections | `GET /v1/collections` | Paginated; optional `status`, `reference_code` |
-| Webhook | `POST <your-url>?key=<llave>` | Body `{ data: { reference_code, amount, status: "paid", ... } }` |
+| Webhook | Prefer `POST <your-url>` + header `x-factus-pay-webhook-key`; query `?key=` still accepted for provider compat | Body `{ data: { reference_code, amount, status: "paid", ... } }`; timing-safe compare |
 
 Commercial adapter path: `apps/commercial-api/src/modules/payments/factus-pay.adapter.ts`  
 Webhook path: `POST /v1/webhooks/factus-pay/collections`

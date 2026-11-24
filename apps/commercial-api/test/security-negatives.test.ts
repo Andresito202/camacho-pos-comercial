@@ -317,6 +317,28 @@ describe("security negatives — trial, captcha, files", () => {
     expect(reused).toBe(1);
   });
 
+  it("rejects Factus Pay webhook with wrong key (header and query)", async () => {
+    const payload = {
+      data: { reference_code: `ref-bad-${Date.now()}`, amount: 1000, status: "paid" },
+    };
+    const viaHeader = await app.inject({
+      method: "POST",
+      url: "/v1/webhooks/factus-pay/collections",
+      headers: { "x-factus-pay-webhook-key": "wrong_key_not_matching_expected_value" },
+      payload,
+    });
+    expect(viaHeader.statusCode).toBe(401);
+    expect(viaHeader.json().code).toBe("FACTUS_PAY_UNAUTHORIZED");
+
+    const viaQuery = await app.inject({
+      method: "POST",
+      url: "/v1/webhooks/factus-pay/collections?key=wrong_key_not_matching_expected_value",
+      payload,
+    });
+    expect(viaQuery.statusCode).toBe(401);
+    expect(viaQuery.json().code).toBe("FACTUS_PAY_UNAUTHORIZED");
+  });
+
   it("refuses local activation without CENTRAL_TRIAL_WEBHOOK_KEY", async () => {
     captcha.verifyFn = async () => ({ success: true });
     const created = await app.inject({

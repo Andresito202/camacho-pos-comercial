@@ -258,12 +258,14 @@ describe("commercial-api critical paths", () => {
       },
     };
 
-    const first = await inject("POST", `/v1/webhooks/factus-pay/collections?key=${key}`, {
+    const first = await inject("POST", `/v1/webhooks/factus-pay/collections`, {
       payload,
+      headers: { "x-factus-pay-webhook-key": key },
     });
     expect([200, 201]).toContain(first.statusCode);
     expect(first.json().result).toBe("STORED");
 
+    // Query key remains for Factus provider compatibility (idempotent duplicate).
     const second = await inject("POST", `/v1/webhooks/factus-pay/collections?key=${key}`, {
       payload,
     });
