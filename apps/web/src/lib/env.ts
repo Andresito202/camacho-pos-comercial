@@ -53,10 +53,12 @@ export function allowAdminTestFixture(): boolean {
   return isDevelopment() && process.env.NEXT_PUBLIC_ALLOW_ADMIN_TEST_FIXTURE === "1";
 }
 
-/** Draft catalog preview is allowed in development and during `next build` when API is offline. */
+/**
+ * Draft catalog preview: development OR Next production *build* phase only.
+ * Runtime production never honors ALLOW_DRAFT_BUILD_FALLBACK (closes prod bypass).
+ */
 export function allowDraftFallback(): boolean {
   if (isDevelopment()) return true;
-  if (process.env.ALLOW_DRAFT_BUILD_FALLBACK === "1") return true;
   // Next sets this while generating the production bundle; runtime production stays fail-closed.
   return process.env.NEXT_PHASE === "phase-production-build";
 }

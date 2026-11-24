@@ -767,10 +767,29 @@ export async function getTrialStatus(
     pendingActivation?: boolean;
     blockedReason: string | null;
     posLicenseProvisioning?: { activated: boolean; gap: string };
-  }>(`/v1/crm/trial/${encodeURIComponent(id)}?token=${encodeURIComponent(accessToken)}`, {
+  }>(`/v1/crm/trial/${encodeURIComponent(id)}`, {
     cache: "no-store",
-  });
+    headers: { "X-Trial-Access-Token": accessToken },
+  } as ApiInit);
   return data ?? null;
+}
+
+export function storeTrialAccessToken(id: string, token: string) {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(`trial-access:${id}`, token);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function readTrialAccessToken(id: string): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.sessionStorage.getItem(`trial-access:${id}`);
+  } catch {
+    return null;
+  }
 }
 
 export async function submitContact(payload: Record<string, string>): Promise<{ ok: boolean; id?: string }> {

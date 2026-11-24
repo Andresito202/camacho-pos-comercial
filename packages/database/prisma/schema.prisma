@@ -953,20 +953,23 @@ model CustomerBenefit {
 // ─── Support / Content ───────────────────────────────────────────────────────
 
 model SupportTicket {
-  id         String                @id @default(cuid())
-  customerId String?
-  email      String
-  subject    String
-  status     SupportTicketStatus   @default(OPEN)
-  priority   SupportTicketPriority @default(NORMAL)
-  createdAt  DateTime              @default(now())
-  updatedAt  DateTime              @updatedAt
-  closedAt   DateTime?
-  deletedAt  DateTime?
+  id              String                @id @default(cuid())
+  customerId      String?
+  email           String
+  subject         String
+  status          SupportTicketStatus   @default(OPEN)
+  priority        SupportTicketPriority @default(NORMAL)
+  /// SHA-256 of one-time access token required for public GET (anti-IDOR).
+  accessTokenHash String
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  closedAt        DateTime?
+  deletedAt       DateTime?
 
   customer CommercialCustomer? @relation(fields: [customerId], references: [id])
   messages SupportMessage[]
 
+  @@unique([accessTokenHash])
   @@index([status])
   @@index([email])
 }

@@ -87,15 +87,27 @@ export class CaptchaService {
     }
 
     const tokenHash = createHash("sha256").update(token.trim()).digest("hex");
-    await this.assertNotReused(tokenHash);
+    // Claim hash BEFORE provider verify — closes TOCTOU parallel reuse race.
+    await this.claimTokenOrThrow(tokenHash, provider);
 
-    const result = this.verifyFn
-      ? await this.verifyFn(provider, token.trim(), remoteIp)
-      : provider === "turnstile"
-        ? await this.verifyTurnstile(token.trim(), remoteIp)
-        : await this.verifyRecaptcha(token.trim(), remoteIp);
+    // Production never honors injectable verifyFn (test-only hook).
+    const useInjected =
+      this.verifyFn != null && this.config.env.NODE_ENV !== "production";
+
+    let result: { success: boolean; errorCodes?: string[]; score?: number };
+    try {
+      result = useInjected
+        ? await this.verifyFn!(provider, token.trim(), remoteIp)
+        : provider === "turnstile"
+          ? await this.verifyTurnstile(token.trim(), remoteIp)
+          : await this.verifyRecaptcha(token.trim(), remoteIp);
+    } catch (error) {
+      await this.releaseClaim(tokenHash);
+      throw error;
+    }
 
     if (!result.success) {
+      await this.releaseClaim(tokenHash);
       const codes = result.errorCodes ?? [];
       const expired = codes.some((c) => /timeout|expired/i.test(c));
       throw new HttpException(
@@ -112,19 +124,23 @@ export class CaptchaService {
 
     const score = "score" in result ? result.score : undefined;
     if (typeof score === "number" && score < 0.3) {
+      await this.releaseClaim(tokenHash);
       throw new HttpException(
         { code: "CAPTCHA_LOW_SCORE", message: "Verificación anti-bot rechazada." },
         HttpStatus.BAD_REQUEST,
       );
     }
-
-    await this.recordUse(tokenHash, provider);
   }
 
-  private async assertNotReused(tokenHash: string): Promise<void> {
+  /** Insert-first claim; unique PK makes parallel reuse fail closed. */
+  private async claimTokenOrThrow(tokenHash: string, provider: string): Promise<void> {
     if (!this.prisma) return;
-    const existing = await this.prisma.captchaTokenUse.findUnique({ where: { tokenHash } });
-    if (existing) {
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    try {
+      await this.prisma.captchaTokenUse.create({
+        data: { tokenHash, provider, expiresAt },
+      });
+    } catch {
       throw new HttpException(
         { code: "CAPTCHA_REUSED", message: "El token anti-bot ya fue utilizado." },
         HttpStatus.BAD_REQUEST,
@@ -132,12 +148,9 @@ export class CaptchaService {
     }
   }
 
-  private async recordUse(tokenHash: string, provider: string): Promise<void> {
+  private async releaseClaim(tokenHash: string): Promise<void> {
     if (!this.prisma) return;
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-    await this.prisma.captchaTokenUse.create({
-      data: { tokenHash, provider, expiresAt },
-    });
+    await this.prisma.captchaTokenUse.delete({ where: { tokenHash } }).catch(() => undefined);
   }
 
   private async verifyTurnstile(token: string, remoteIp?: string) {

@@ -108,80 +108,92 @@ export class CrmService {
 
     const email = input.email.toLowerCase();
     const idKey = identityKey(email, input.phoneE164);
-
-    const open = await this.prisma.trialEnrollment.findFirst({
-      where: {
-        deletedAt: null,
-        identityKey: idKey,
-        status: { in: ["PENDING_ACTIVATION", "ACTIVE"] },
-      },
-      select: { id: true, status: true },
-    });
-    if (open) {
-      throw new ConflictException({
-        code: "TRIAL_ALREADY_OPEN",
-        message:
-          "Ya existe una prueba abierta para esta identidad. Espera la activación Central o el vencimiento/bloqueo antes de solicitar otra.",
-      });
-    }
-
-    const recent = await this.prisma.trialEnrollment.count({
-      where: {
-        identityKey: idKey,
-        createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
-        deletedAt: null,
-      },
-    });
-    if (recent >= 3) {
-      throw new ConflictException({
-        code: "TRIAL_ABUSE_LIMIT",
-        message: "Se alcanzó el límite de solicitudes de prueba para esta identidad.",
-      });
-    }
-
     const accessToken = randomBytes(32).toString("hex");
     const accessTokenHash = sha256(accessToken);
 
-    const lead = await this.prisma.lead.create({
-      data: {
-        email,
-        fullName: input.fullName,
-        phoneE164: input.phoneE164,
-        companyName: input.companyName,
-        businessType: input.sector,
-        source: input.sourcePath ?? "prueba-5-dias",
-        status: "QUALIFIED",
-        notes: [input.notes, input.city ? `Ciudad: ${input.city}` : null, "Prueba 5 días PENDING_ACTIVATION"].filter(Boolean).join(" | "),
-        consentDataTreatment: true,
-        activities: {
-          create: {
-            type: "SYSTEM",
-            body: "Trial registrado en PENDING_ACTIVATION. Reloj no iniciado hasta confirmación Central.",
-            actorType: "SYSTEM",
+    // Advisory lock + partial unique index close parallel enrollment TOCTOU.
+    const trial = await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`trial:${idKey}`}))`;
+
+      const open = await tx.trialEnrollment.findFirst({
+        where: {
+          deletedAt: null,
+          identityKey: idKey,
+          status: { in: ["PENDING_ACTIVATION", "ACTIVE"] },
+        },
+        select: { id: true, status: true },
+      });
+      if (open) {
+        throw new ConflictException({
+          code: "TRIAL_ALREADY_OPEN",
+          message:
+            "Ya existe una prueba abierta para esta identidad. Espera la activación Central o el vencimiento/bloqueo antes de solicitar otra.",
+        });
+      }
+
+      const recent = await tx.trialEnrollment.count({
+        where: {
+          identityKey: idKey,
+          createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+          deletedAt: null,
+        },
+      });
+      if (recent >= 3) {
+        throw new ConflictException({
+          code: "TRIAL_ABUSE_LIMIT",
+          message: "Se alcanzó el límite de solicitudes de prueba para esta identidad.",
+        });
+      }
+
+      const lead = await tx.lead.create({
+        data: {
+          email,
+          fullName: input.fullName,
+          phoneE164: input.phoneE164,
+          companyName: input.companyName,
+          businessType: input.sector,
+          source: input.sourcePath ?? "prueba-5-dias",
+          status: "QUALIFIED",
+          notes: [input.notes, input.city ? `Ciudad: ${input.city}` : null, "Prueba 5 días PENDING_ACTIVATION"].filter(Boolean).join(" | "),
+          consentDataTreatment: true,
+          activities: {
+            create: {
+              type: "SYSTEM",
+              body: "Trial registrado en PENDING_ACTIVATION. Reloj no iniciado hasta confirmación Central.",
+              actorType: "SYSTEM",
+            },
           },
         },
-      },
-    });
+      });
 
-    const trial = await this.prisma.trialEnrollment.create({
-      data: {
-        leadId: lead.id,
-        fullName: input.fullName,
-        email,
-        phoneE164: input.phoneE164,
-        companyName: input.companyName,
-        sector: input.sector,
-        city: input.city,
-        notes: input.notes,
-        status: "PENDING_ACTIVATION",
-        startsAt: null,
-        expiresAt: null,
-        accessTokenHash,
-        identityKey: idKey,
-        consentDataTreatment: true,
-        consentTerms: true,
-        sourcePath: input.sourcePath ?? "/prueba-5-dias",
-      },
+      try {
+        return await tx.trialEnrollment.create({
+          data: {
+            leadId: lead.id,
+            fullName: input.fullName,
+            email,
+            phoneE164: input.phoneE164,
+            companyName: input.companyName,
+            sector: input.sector,
+            city: input.city,
+            notes: input.notes,
+            status: "PENDING_ACTIVATION",
+            startsAt: null,
+            expiresAt: null,
+            accessTokenHash,
+            identityKey: idKey,
+            consentDataTreatment: true,
+            consentTerms: true,
+            sourcePath: input.sourcePath ?? "/prueba-5-dias",
+          },
+        });
+      } catch {
+        throw new ConflictException({
+          code: "TRIAL_ALREADY_OPEN",
+          message:
+            "Ya existe una prueba abierta para esta identidad. Espera la activación Central o el vencimiento/bloqueo antes de solicitar otra.",
+        });
+      }
     });
 
     await this.audit.record({
@@ -189,19 +201,20 @@ export class CrmService {
       action: "TRIAL_ENROLLMENT_CREATED",
       entityType: "TrialEnrollment",
       entityId: trial.id,
-      metadata: { status: "PENDING_ACTIVATION", leadId: lead.id },
+      metadata: { status: "PENDING_ACTIVATION", leadId: trial.leadId },
     });
 
     return {
       id: trial.id,
-      leadId: lead.id,
+      leadId: trial.leadId,
       status: trial.status,
       startsAt: null,
       expiresAt: null,
       trialDays: TRIAL_DAYS,
-      /** Shown once — required to read status; not recoverable later. */
+      trialHours: TRIAL_DAYS * 24,
+      /** Shown once — store client-side (sessionStorage); never put in URL query. */
       accessToken,
-      statusPath: `/prueba-5-dias/estado/${trial.id}?token=${accessToken}`,
+      statusPath: `/prueba-5-dias/estado/${trial.id}`,
       posLicenseProvisioning: {
         activated: false,
         gap: POS_LICENSE_GAP,
@@ -232,6 +245,22 @@ export class CrmService {
     return this.serializeTrialPublic(current);
   }
 
+  async assertCentralWebhookKey(webhookKey: string | undefined): Promise<void> {
+    const expected = this.config.env.CENTRAL_TRIAL_WEBHOOK_KEY?.trim();
+    if (!expected || expected.length < 32) {
+      throw new ServiceUnavailableException({
+        code: "CENTRAL_TRIAL_WEBHOOK_NOT_CONFIGURED",
+        message: "Operación trial Central requiere CENTRAL_TRIAL_WEBHOOK_KEY. No hay simulación local.",
+      });
+    }
+    const provided = webhookKey ?? "";
+    const a = createHash("sha256").update(expected).digest();
+    const b = createHash("sha256").update(provided).digest();
+    if (a.length !== b.length || !timingSafeEqual(a, b)) {
+      throw new ForbiddenException({ code: "CENTRAL_WEBHOOK_FORBIDDEN" });
+    }
+  }
+
   /**
    * Central-only activation. Fails closed without CENTRAL_TRIAL_WEBHOOK_KEY.
    * Never activates from local "simulate" paths.
@@ -241,50 +270,49 @@ export class CrmService {
     webhookKey: string | undefined;
     centralLicenseRef: string;
   }) {
-    const expected = this.config.env.CENTRAL_TRIAL_WEBHOOK_KEY?.trim();
-    if (!expected || expected.length < 32) {
-      throw new ServiceUnavailableException({
-        code: "CENTRAL_TRIAL_WEBHOOK_NOT_CONFIGURED",
-        message: "Activación de trial requiere CENTRAL_TRIAL_WEBHOOK_KEY y confirmación Central. No hay simulación local.",
-      });
-    }
-    const provided = input.webhookKey ?? "";
-    const a = createHash("sha256").update(expected).digest();
-    const b = createHash("sha256").update(provided).digest();
-    if (a.length !== b.length || !timingSafeEqual(a, b)) {
-      throw new ForbiddenException({ code: "CENTRAL_WEBHOOK_FORBIDDEN" });
-    }
+    await this.assertCentralWebhookKey(input.webhookKey);
     if (!input.centralLicenseRef || input.centralLicenseRef.trim().length < 8) {
       throw new BadRequestException({ code: "CENTRAL_LICENSE_REF_REQUIRED" });
     }
 
-    const trial = await this.prisma.trialEnrollment.findFirst({
-      where: { id: input.trialId, deletedAt: null },
-    });
-    if (!trial) throw new NotFoundException({ code: "TRIAL_NOT_FOUND" });
-    if (trial.status === "ACTIVE") {
-      return this.serializeTrialPublic(trial, { includePii: false });
-    }
-    if (trial.status !== "PENDING_ACTIVATION") {
-      throw new ConflictException({
-        code: "TRIAL_NOT_ACTIVATABLE",
-        message: `Estado actual ${trial.status} no admite activación.`,
-      });
-    }
-
     const startsAt = new Date();
     const expiresAt = new Date(startsAt.getTime() + TRIAL_DAYS * 24 * 60 * 60 * 1000);
-    const updated = await this.prisma.trialEnrollment.update({
-      where: { id: trial.id },
+    const licenseRef = input.centralLicenseRef.trim();
+
+    // Conditional update — exactly-once activation under concurrent webhook delivery.
+    const claimed = await this.prisma.trialEnrollment.updateMany({
+      where: {
+        id: input.trialId,
+        deletedAt: null,
+        status: "PENDING_ACTIVATION",
+      },
       data: {
         status: "ACTIVE",
         startsAt,
         expiresAt,
         activatedAt: startsAt,
         activationSource: "CENTRAL_LICENSE_CONFIRMED",
-        centralLicenseRef: input.centralLicenseRef.trim(),
+        centralLicenseRef: licenseRef,
       },
     });
+
+    const trial = await this.prisma.trialEnrollment.findFirst({
+      where: { id: input.trialId, deletedAt: null },
+    });
+    if (!trial) throw new NotFoundException({ code: "TRIAL_NOT_FOUND" });
+
+    if (claimed.count === 0) {
+      if (trial.status === "ACTIVE" && trial.centralLicenseRef === licenseRef) {
+        return this.serializeTrialPublic(trial, { includePii: false });
+      }
+      if (trial.status === "ACTIVE") {
+        return this.serializeTrialPublic(trial, { includePii: false });
+      }
+      throw new ConflictException({
+        code: "TRIAL_NOT_ACTIVATABLE",
+        message: `Estado actual ${trial.status} no admite activación.`,
+      });
+    }
 
     await this.audit.record({
       actorType: "SYSTEM",
@@ -292,12 +320,13 @@ export class CrmService {
       entityType: "TrialEnrollment",
       entityId: trial.id,
       metadata: {
-        centralLicenseRef: input.centralLicenseRef.trim(),
+        centralLicenseRef: licenseRef,
         expiresAt: expiresAt.toISOString(),
+        trialHours: TRIAL_DAYS * 24,
       },
     });
 
-    return this.serializeTrialPublic(updated, { includePii: false });
+    return this.serializeTrialPublic(trial, { includePii: false });
   }
 
   /** Durable expiry sweep — mark ACTIVE past expiresAt as EXPIRED/BLOCKED. */

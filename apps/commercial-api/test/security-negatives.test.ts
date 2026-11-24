@@ -183,7 +183,7 @@ describe("security negatives — trial, captcha, files", () => {
     expect(second.json().code).toBe("TRIAL_ALREADY_OPEN");
   });
 
-  it("hides trial status without token (anti-enumeration)", async () => {
+  it("hides trial status without token (anti-enumeration; no query token)", async () => {
     captcha.verifyFn = async () => ({ success: true });
     const created = await app.inject({
       method: "POST",
@@ -200,22 +200,121 @@ describe("security negatives — trial, captcha, files", () => {
       },
     });
     const id = created.json().id as string;
+    expect(String(created.json().statusPath ?? "")).not.toContain("token=");
     const missing = await app.inject({ method: "GET", url: `/v1/crm/trial/${id}` });
     expect(missing.statusCode).toBe(404);
+    const queryIgnored = await app.inject({
+      method: "GET",
+      url: `/v1/crm/trial/${id}?token=${created.json().accessToken}`,
+    });
+    expect(queryIgnored.statusCode).toBe(404);
     const wrong = await app.inject({
       method: "GET",
-      url: `/v1/crm/trial/${id}?token=deadbeefdeadbeefdeadbeefdeadbeef`,
+      url: `/v1/crm/trial/${id}`,
+      headers: { "x-trial-access-token": "deadbeefdeadbeefdeadbeefdeadbeef" },
     });
     expect(wrong.statusCode).toBe(404);
     const ok = await app.inject({
       method: "GET",
-      url: `/v1/crm/trial/${id}?token=${created.json().accessToken}`,
+      url: `/v1/crm/trial/${id}`,
+      headers: { "x-trial-access-token": created.json().accessToken },
     });
     expect(ok.statusCode).toBeLessThan(300);
     const body = ok.json();
     expect(body.email).toBeUndefined();
     expect(body.fullName).toBeUndefined();
     expect(body.status).toBe("PENDING_ACTIVATION");
+  });
+
+  it("blocks concurrent duplicate open trials for same identity", async () => {
+    captcha.verifyFn = async () => ({ success: true });
+    const email = `trial.race.${Date.now()}@example.com`;
+    const phone = "+573001110099";
+    const mk = (n: number) =>
+      app.inject({
+        method: "POST",
+        url: "/v1/crm/trial",
+        payload: {
+          fullName: "Race User",
+          email,
+          phoneE164: phone,
+          companyName: "Negocio",
+          consentDataTreatment: true,
+          consentTerms: true,
+          website: "",
+          captchaToken: `race-token-${Date.now()}-${n}-iiiiiiii`,
+        },
+      });
+    const [a, b] = await Promise.all([mk(1), mk(2)]);
+    const codes = [a.statusCode, b.statusCode].sort();
+    expect(codes[0]).toBeLessThan(300);
+    expect(codes[1]).toBe(409);
+    const openCount = await prisma.trialEnrollment.count({
+      where: {
+        email,
+        deletedAt: null,
+        status: { in: ["PENDING_ACTIVATION", "ACTIVE"] },
+      },
+    });
+    expect(openCount).toBe(1);
+  });
+
+  it("refuses unauthenticated trial expire-due", async () => {
+    const res = await app.inject({ method: "POST", url: "/v1/crm/trial/expire-due" });
+    expect([403, 503]).toContain(res.statusCode);
+  });
+
+  it("blocks support ticket IDOR without access token", async () => {
+    const created = await app.inject({
+      method: "POST",
+      url: "/v1/support/tickets",
+      payload: {
+        email: `ticket.${Date.now()}@example.com`,
+        subject: "Ayuda con licencia",
+        body: "No puedo activar la caja de prueba",
+        priority: "NORMAL",
+      },
+    });
+    expect(created.statusCode).toBeLessThan(300);
+    const id = created.json().id as string;
+    const token = created.json().accessToken as string;
+    expect(token).toBeTruthy();
+    const naked = await app.inject({ method: "GET", url: `/v1/support/tickets/${id}` });
+    expect(naked.statusCode).toBe(404);
+    const ok = await app.inject({
+      method: "GET",
+      url: `/v1/support/tickets/${id}`,
+      headers: { "x-ticket-access-token": token },
+    });
+    expect(ok.statusCode).toBeLessThan(300);
+    expect(ok.json().email).toBeUndefined();
+  });
+
+  it("rejects captcha claim race (parallel identical token)", async () => {
+    captcha.verifyFn = async () => {
+      await new Promise((r) => setTimeout(r, 30));
+      return { success: true };
+    };
+    const token = `parallel-token-${Date.now()}-jjjjjjjj`;
+    const payload = {
+      fullName: "Parallel",
+      email: `par.${Date.now()}@example.com`,
+      message: "mensaje de contacto paralelo",
+      website: "",
+      captchaToken: token,
+    };
+    const [a, b] = await Promise.all([
+      app.inject({ method: "POST", url: "/v1/crm/contact", payload }),
+      app.inject({
+        method: "POST",
+        url: "/v1/crm/contact",
+        payload: { ...payload, email: `par2.${Date.now()}@example.com` },
+      }),
+    ]);
+    const ok = [a, b].filter((r) => r.statusCode < 300).length;
+    const reused = [a, b].filter((r) => r.statusCode === 400 && r.json().code === "CAPTCHA_REUSED").length;
+    expect(ok).toBe(1);
+    expect(reused).toBe(1);
   });
 
   it("refuses local activation without CENTRAL_TRIAL_WEBHOOK_KEY", async () => {

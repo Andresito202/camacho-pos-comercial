@@ -1,4 +1,4 @@
-import { Inject, Controller, Get, Param, Post, Req } from "@nestjs/common";
+import { ForbiddenException, Inject, Controller, Get, Param, Post, Req } from "@nestjs/common";
 import type { PrismaClient } from "@camacho-pos-comercial/database";
 import { PRISMA } from "../../common/prisma.tokens.js";
 import { RateLimitService } from "../../common/rate-limit/rate-limit.service.js";
@@ -40,7 +40,7 @@ export class PaymentsController {
   sandboxSimulate(@Param("referenceCode") referenceCode: string, @Req() req: { ip?: string }) {
     this.rateLimit.assert(`sandbox-simulate:${req.ip ?? "unknown"}`, 20, 60_000);
     if (this.config.isProduction) {
-      return { error: "SANDBOX_ONLY" };
+      throw new ForbiddenException({ code: "SANDBOX_ONLY" });
     }
     return this.payments.sandboxSimulatePaid(referenceCode);
   }

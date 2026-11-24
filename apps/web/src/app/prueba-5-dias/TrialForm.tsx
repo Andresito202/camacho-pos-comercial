@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useState } from "react";
 import { Button, Input, TextArea } from "@camacho-pos/ui";
 import { CaptchaField, HoneypotField } from "@/components/FormSecurity";
-import { submitTrialRequest } from "@/lib/api";
+import { storeTrialAccessToken, submitTrialRequest } from "@/lib/api";
 
 export function TrialForm() {
   const [result, setResult] = useState<{
@@ -22,26 +22,20 @@ export function TrialForm() {
   const onToken = useCallback((token: string | undefined) => setCaptchaToken(token), []);
 
   if (result) {
-    const href =
-      result.statusPath ??
-      (result.accessToken
-        ? `/prueba-5-dias/estado/${result.id}?token=${encodeURIComponent(result.accessToken)}`
-        : null);
+    const href = result.statusPath ?? `/prueba-5-dias/estado/${result.id}`;
     return (
       <div className="rounded-[var(--radius)] border border-[var(--teal)]/30 bg-[color-mix(in_srgb,var(--teal)_8%,white)] p-5">
         <p className="font-bold text-[var(--navy)]">Solicitud registrada — pendiente de activación</p>
         <p className="mt-2 text-sm text-[var(--muted)]">
-          Estado <code className="font-mono text-xs">{result.status ?? "PENDING_ACTIVATION"}</code>. El reloj de 5
-          días <strong>no ha iniciado</strong>: comienza solo cuando Central confirma la licencia POS real. Guarda el
-          enlace de estado (incluye token de acceso de un solo uso en la URL).
+          Estado <code className="font-mono text-xs">{result.status ?? "PENDING_ACTIVATION"}</code>. El reloj de 120
+          horas <strong>no ha iniciado</strong>: comienza solo cuando Central confirma la licencia POS real. El token de
+          acceso queda en esta sesión del navegador (no en la URL).
         </p>
         <p className="mt-2 font-mono text-xs text-[var(--muted)]">Ref. {result.id}</p>
         <div className="mt-4 flex flex-wrap gap-3">
-          {href ? (
-            <Link href={href} className="inline-flex">
-              <Button>Ver estado</Button>
-            </Link>
-          ) : null}
+          <Link href={href} className="inline-flex">
+            <Button>Ver estado</Button>
+          </Link>
           <Link href="/contratar" className="inline-flex">
             <Button variant="outline">Contratar ahora</Button>
           </Link>
@@ -70,6 +64,7 @@ export function TrialForm() {
           setError(res.error ?? "No se pudo registrar la prueba.");
           return;
         }
+        if (res.accessToken) storeTrialAccessToken(res.id, res.accessToken);
         setResult({
           id: res.id,
           ...(res.accessToken ? { accessToken: res.accessToken } : {}),

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Inject, Param, Post, Query, Req } from "@nestjs/common";
+import { Body, Controller, Get, Headers, Inject, Param, Post, Req } from "@nestjs/common";
 import {
   ContactRequestSchema,
   DemoRequestSchema,
@@ -71,11 +71,11 @@ export class CrmController {
   async trialStatus(
     @Req() req: IpReq,
     @Param("id") id: string,
-    @Query("token") token?: string,
+    @Headers("x-trial-access-token") headerToken?: string,
   ) {
     await this.rateLimit.assertAsync(`crm:trial-status:${req.ip ?? "unknown"}`, 30, 60_000);
-    // Missing/wrong token → same 404 — no existence oracle / no cross-tenant PII.
-    return this.crm.getTrialStatus(id, token);
+    // Token ONLY via header — never query string (Referer/log leak).
+    return this.crm.getTrialStatus(id, headerToken);
   }
 
   /**
@@ -99,9 +99,13 @@ export class CrmController {
   }
 
   @Post("trial/expire-due")
-  async expireDue(@Req() req: IpReq) {
+  async expireDue(
+    @Req() req: IpReq,
+    @Headers("x-central-trial-webhook-key") webhookKey?: string,
+  ) {
     await this.rateLimit.assertAsync(`crm:trial-expire:${req.ip ?? "unknown"}`, 10, 60_000);
-    // Durable expiry job — also safe to call from ops cron. Does not talk to Central.
+    // Same shared secret as activation — prevents unauthenticated expiry sweeps.
+    await this.crm.assertCentralWebhookKey(webhookKey);
     return this.crm.expireDueTrials();
   }
 
