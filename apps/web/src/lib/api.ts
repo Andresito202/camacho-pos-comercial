@@ -207,6 +207,14 @@ function mapFeatureStatus(value?: string | null): FeatureStatus {
     case "COMING_SOON":
     case "PROXIMAMENTE":
       return "proximamente";
+    case "DRAFT":
+    case "BORRADOR":
+      // Provisional catalog visible in development; purchase remains gated server-side.
+      return "borrador";
+    case "ARCHIVED":
+    case "UNPUBLISHED":
+    case "NO_PUBLICADA":
+      return "no_publicada";
     default:
       return "no_publicada";
   }
@@ -233,6 +241,9 @@ function pickPrice(
 function mapPlan(plan: ApiPlan): Plan {
   const monthly = pickPrice(plan.prices, "MONTHLY");
   const yearly = pickPrice(plan.prices, "ANNUAL");
+  const perpetual = pickPrice(plan.prices, "PERPETUAL");
+  const primary = monthly ?? yearly ?? perpetual;
+  const primaryInterval = (primary?.billingInterval ?? "MONTHLY") as Plan["primaryInterval"];
   return {
     id: plan.id,
     slug: plan.slug,
@@ -240,15 +251,16 @@ function mapPlan(plan: ApiPlan): Plan {
     tagline: plan.tagline ?? plan.description.slice(0, 120),
     description: plan.description,
     priceMonthly: {
-      amountCents: monthly?.amountCents ?? 0,
+      amountCents: primary?.amountCents ?? 0,
       currency: "COP",
     },
-    ...(monthly
-      ? { planPriceId: monthly.id, priceVersion: monthly.version }
+    primaryInterval,
+    ...(primary
+      ? { planPriceId: primary.id, priceVersion: primary.version }
       : {}),
     highlights: (plan.features ?? []).map((f) => f.label).slice(0, 6),
     status: mapFeatureStatus(plan.publicationStatus),
-    featured: plan.publicationStatus === "PUBLISHED",
+    featured: plan.publicationStatus === "PUBLISHED" || plan.publicationStatus === "DRAFT",
     ...(yearly ? { priceYearly: { amountCents: yearly.amountCents, currency: "COP" as const } } : {}),
   };
 }
@@ -266,7 +278,7 @@ function mapProduct(product: ApiProduct): Equipment {
     price: { amountCents: variant?.amountCents ?? 0, currency: "COP" },
     image: `/images/hardware/${guessHardwareImage(product.slug)}`,
     status: mapFeatureStatus(product.publicationStatus),
-    featured: product.publicationStatus === "PUBLISHED",
+    featured: product.publicationStatus === "PUBLISHED" || product.publicationStatus === "DRAFT",
     specs: (product.variants ?? []).map((v) => v.name),
     ...(variant
       ? { productVariantId: variant.id, priceVersion: variant.version }
@@ -285,7 +297,7 @@ function mapKit(kit: ApiKit): Equipment {
     price: { amountCents: kit.amountCents, currency: "COP" },
     image: "/images/hardware/terminal-tactil.svg",
     status: mapFeatureStatus(kit.publicationStatus),
-    featured: true,
+    featured: kit.publicationStatus === "PUBLISHED" || kit.publicationStatus === "DRAFT",
     specs: ["Kit comercial", `slug:${kit.slug}`],
     kitId: kit.id,
     priceVersion: kit.priceVersion,

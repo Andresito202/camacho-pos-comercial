@@ -1,4 +1,9 @@
-export type FeatureStatus = "disponible" | "en_certificacion" | "proximamente" | "no_publicada";
+export type FeatureStatus =
+  | "disponible"
+  | "en_certificacion"
+  | "proximamente"
+  | "borrador"
+  | "no_publicada";
 
 export type Money = {
   amountCents: number;
@@ -13,6 +18,8 @@ export type Plan = {
   description: string;
   priceMonthly: Money;
   priceYearly?: Money;
+  /** Primary price interval shown on cards (MONTHLY | ANNUAL | PERPETUAL). */
+  primaryInterval?: "MONTHLY" | "ANNUAL" | "PERPETUAL";
   /** Server plan-price id used by POST /v1/cart/:token/items */
   planPriceId?: string;
   priceVersion?: number;

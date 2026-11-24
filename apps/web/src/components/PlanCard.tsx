@@ -16,7 +16,13 @@ export function PlanCard({ plan }: { plan: Plan }) {
       </div>
       <p className="font-serif text-3xl text-[var(--navy)]">
         {formatMoney(plan.priceMonthly)}
-        <span className="text-base font-sans text-[var(--muted)]"> / mes</span>
+        <span className="text-base font-sans text-[var(--muted)]">
+          {plan.primaryInterval === "PERPETUAL"
+            ? " pago único"
+            : plan.primaryInterval === "ANNUAL"
+              ? " / año"
+              : " / mes"}
+        </span>
       </p>
       <ul className="mt-5 flex-1 space-y-2 text-sm text-[var(--steel)]">
         {plan.highlights.map((item) => (

@@ -232,7 +232,7 @@ export default async function HomePage() {
 
       <Section eyebrow="Planes" title="Licencias claras, precios en COP" lead="Los planes se cargan desde commercial-api. Si el API no responde en desarrollo, verás preview DRAFT.">
         <div className="grid gap-5 lg:grid-cols-3">
-          {plans.data.filter((plan) => plan.status !== "no_publicada").map((plan) => (
+          {plans.data.filter((plan) => plan.status !== "no_publicada").slice(0, 3).map((plan) => (
             <PlanCard key={plan.id} plan={plan} />
           ))}
         </div>
