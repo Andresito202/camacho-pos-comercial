@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { DraftBanner } from "@/components/DraftBanner";
 import { PlanCatalog } from "@/components/PlanCatalog";
 import { Section } from "@/components/Section";
@@ -12,13 +13,7 @@ export const metadata = buildMetadata({
   path: "/planes",
 });
 
-export default async function PlanesPage({
-  searchParams,
-}: {
-  searchParams?: Promise<{ solucion?: string }>;
-}) {
-  const params = searchParams ? await searchParams : undefined;
-  const initialSolutionMode = params?.solucion === "completo" ? "COMPLETE" : "SOFTWARE";
+export default async function PlanesPage() {
   const [plans, equipment] = await Promise.all([getPlans(), getEquipmentList()]);
   const visible = plans.data.filter((p) => isCatalogVisible(p.status));
   const kits = equipment.data.filter((item) => item.category === "Kit" || Boolean(item.kitId));
@@ -58,7 +53,9 @@ export default async function PlanesPage({
         lead="Tres planes recurrentes juntos; la licencia perpetua se presenta aparte. Una licencia = una caja."
       >
         {visible.length > 0 ? (
-          <PlanCatalog plans={visible} kits={kits} initialSolutionMode={initialSolutionMode} />
+          <Suspense fallback={<p className="text-[var(--muted)]">Cargando catálogo…</p>}>
+            <PlanCatalog plans={visible} kits={kits} />
+          </Suspense>
         ) : (
           <p className="text-[var(--muted)]">No hay planes visibles en el catálogo en este momento.</p>
         )}

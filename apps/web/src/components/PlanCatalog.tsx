@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { Button } from "@camacho-pos/ui";
 import { HireModalTrigger } from "@/components/HireModal";
@@ -246,7 +247,10 @@ export function PlanCatalog({
   kits: Equipment[];
   initialSolutionMode?: SolutionMode;
 }) {
-  const [solutionMode, setSolutionMode] = useState<SolutionMode>(initialSolutionMode);
+  // Client-side query keeps /planes statically rendered so metadata stays in <head> for crawlers/Lighthouse.
+  const searchParams = useSearchParams();
+  const fromQuery = searchParams.get("solucion") === "completo" ? "COMPLETE" : null;
+  const [solutionMode, setSolutionMode] = useState<SolutionMode>(fromQuery ?? initialSolutionMode);
   const [interval, setInterval] = useState<Exclude<BillingInterval, "PERPETUAL">>("MONTHLY");
 
   const recurring = plans.filter(
