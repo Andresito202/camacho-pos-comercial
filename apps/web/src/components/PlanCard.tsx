@@ -35,9 +35,12 @@ export function PlanCard({ plan }: { plan: Plan }) {
         ))}
       </ul>
       <div className="mt-6 flex flex-wrap gap-2">
-        <HireModalTrigger plan={plan} />
+        <HireModalTrigger
+          plan={plan}
+          modality={plan.primaryInterval === "ANNUAL" || plan.primaryInterval === "PERPETUAL" ? plan.primaryInterval : "MONTHLY"}
+        />
         <Link href={`/planes/${plan.slug}`} className="inline-flex items-center px-3 text-sm font-medium underline-offset-2 hover:underline">
-          Ver detalle
+          Ver características
         </Link>
       </div>
     </article>

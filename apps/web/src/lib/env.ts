@@ -19,6 +19,14 @@ export function isDevelopment(): boolean {
   return process.env.NODE_ENV !== "production";
 }
 
+/**
+ * OPTIONAL staging admin UI fixture (must match API ALLOW_ADMIN_TEST_FIXTURE).
+ * NEVER enable in production. Sends X-Admin-Test-Fixture when calling admin APIs.
+ */
+export function allowAdminTestFixture(): boolean {
+  return isDevelopment() && process.env.NEXT_PUBLIC_ALLOW_ADMIN_TEST_FIXTURE === "1";
+}
+
 /** Draft catalog preview is allowed in development and during `next build` when API is offline. */
 export function allowDraftFallback(): boolean {
   if (isDevelopment()) return true;

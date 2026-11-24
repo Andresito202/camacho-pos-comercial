@@ -7,8 +7,8 @@ import { Button } from "@camacho-pos/ui";
 import { useCart } from "@/lib/cart-store";
 
 const NAV = [
-  { href: "/software-pos", label: "Software" },
-  { href: "/planes", label: "Planes" },
+  { href: "/software-pos", label: "Software POS" },
+  { href: "/planes", label: "Planes y precios" },
   { href: "/equipos", label: "Equipos" },
   { href: "/soluciones", label: "Soluciones" },
   { href: "/cobertura", label: "Cobertura" },
@@ -32,16 +32,20 @@ export function SiteHeader({
           <Image
             src="/brand/logo-yellow.png"
             alt="Camacho POS Colombia"
-            width={180}
-            height={64}
-            className="h-10 w-auto sm:h-12"
+            width={220}
+            height={78}
+            className="h-12 w-auto sm:h-14"
             priority
           />
         </Link>
 
-        <nav className="hidden items-center gap-5 lg:flex" aria-label="Principal">
+        <nav className="hidden items-center gap-4 xl:gap-5 lg:flex" aria-label="Principal">
           {NAV.map((item) => (
-            <Link key={item.href} href={item.href} className="text-sm font-medium text-[var(--steel)] hover:text-[var(--navy)]">
+            <Link
+              key={item.href}
+              href={item.href}
+              className="text-sm font-semibold text-[var(--steel)] hover:text-[var(--navy)]"
+            >
               {item.label}
             </Link>
           ))}
@@ -72,7 +76,7 @@ export function SiteHeader({
               onClick={() => {
                 window.alert(
                   loginBlockedReason ??
-                    "El inicio de sesión requiere Central Authority configurada.",
+                    "El inicio de sesión requiere el servicio de acceso configurado.",
                 );
               }}
             >
@@ -97,7 +101,7 @@ export function SiteHeader({
           <ul className="space-y-2">
             {NAV.map((item) => (
               <li key={item.href}>
-                <Link href={item.href} className="block py-2 text-sm font-medium" onClick={() => setOpen(false)}>
+                <Link href={item.href} className="block py-2 text-sm font-semibold" onClick={() => setOpen(false)}>
                   {item.label}
                 </Link>
               </li>

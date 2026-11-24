@@ -4,7 +4,7 @@ import { buildMetadata, faqJsonLd, JsonLd } from "@/lib/seo";
 
 export const metadata = buildMetadata({
   title: "Preguntas frecuentes",
-  description: "FAQ de Camacho POS Colombia: local-first, roles, facturación, instalación y pagos.",
+  description: "FAQ de Camacho POS Colombia: venta sin internet, roles, facturación, instalación y pagos.",
   path: "/preguntas-frecuentes",
 });
 

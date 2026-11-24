@@ -7,7 +7,7 @@ export function DraftBanner({ source }: { source: ApiSource }) {
       className="border-b border-[color-mix(in_srgb,var(--yellow)_45%,transparent)] bg-[color-mix(in_srgb,var(--yellow)_22%,white)] px-4 py-2 text-center text-sm text-[var(--navy)]"
       role="status"
     >
-      Vista previa DRAFT: commercial-api no respondió. Contenido etiquetado solo para desarrollo.
+      Vista previa de desarrollo: el catálogo en vivo no respondió. Contenido de referencia solo para entorno local.
     </div>
   );
 }

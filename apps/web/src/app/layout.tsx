@@ -26,7 +26,7 @@ const sourceSerif = Source_Serif_4({
 export const metadata: Metadata = buildMetadata({
   title: "Camacho POS Colombia | Software POS y kits para tu negocio",
   description:
-    "Vende, controla y haz crecer tu negocio con Camacho POS Colombia. Software local-first, planes y equipos para tiendas, droguerías, panaderías y más.",
+    "Vende, controla y haz crecer tu negocio con Camacho POS Colombia. Software POS, planes y equipos para tiendas, droguerías, panaderías y más.",
   path: "/",
 });
 

@@ -9,7 +9,7 @@ import {
   draftSettings,
   draftSolutions,
 } from "./draft-data";
-import { allowDraftFallback, getApiUrl, isDevelopment } from "./env";
+import { allowAdminTestFixture, allowDraftFallback, getApiUrl, isDevelopment } from "./env";
 import type {
   AdminSession,
   ApiSource,
@@ -33,6 +33,9 @@ export type FetchResult<T> = {
   source: ApiSource;
 };
 
+/** Architecture / payment codes kept out of public plan bullets. */
+const HIDDEN_PUBLIC_FEATURE_CODES = new Set(["sqlite_single_writer", "factus_pay"]);
+
 type ApiPlan = {
   id: string;
   slug: string;
@@ -40,7 +43,14 @@ type ApiPlan = {
   tagline?: string | null;
   description: string;
   publicationStatus: string;
-  features?: Array<{ label: string; commercialStatus?: string }>;
+  licensesPerUnit?: number;
+  features?: Array<{
+    code?: string;
+    label: string;
+    description?: string | null;
+    commercialStatus?: string;
+    sortOrder?: number;
+  }>;
   prices?: Array<{
     id: string;
     billingInterval: string;
@@ -59,6 +69,8 @@ type ApiProduct = {
   description: string;
   kind?: string;
   publicationStatus: string;
+  category?: { slug?: string; name?: string } | null;
+  images?: Array<{ url: string; alt?: string | null }>;
   variants?: Array<{
     id: string;
     name: string;
@@ -66,6 +78,20 @@ type ApiProduct = {
     publicationStatus: string;
     version: number;
   }>;
+};
+
+type ApiPromotion = {
+  id: string;
+  code: string;
+  name: string;
+  description?: string | null;
+  publicationStatus: string;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  validUntil?: string | null;
+  active?: boolean;
+  ctaHref?: string;
+  ctaLabel?: string;
 };
 
 type ApiKit = {
@@ -102,6 +128,9 @@ type ApiSettings = {
   supportEmail?: string;
   publicationStatus?: string;
   whatsappIsDevPlaceholder?: boolean;
+  promoBannerMessage?: string | null;
+  promoBannerHref?: string | null;
+  promoBannerCta?: string | null;
 };
 
 type ApiZone = {
@@ -244,6 +273,43 @@ function mapPlan(plan: ApiPlan): Plan {
   const perpetual = pickPrice(plan.prices, "PERPETUAL");
   const primary = monthly ?? yearly ?? perpetual;
   const primaryInterval = (primary?.billingInterval ?? "MONTHLY") as Plan["primaryInterval"];
+  const publicFeatures = (plan.features ?? []).filter(
+    (f) => !f.code || !HIDDEN_PUBLIC_FEATURE_CODES.has(f.code),
+  );
+  const features = publicFeatures.map((f) => ({
+    code: f.code ?? f.label,
+    label: f.label,
+    ...(f.description ? { description: f.description } : {}),
+    commercialStatus: mapFeatureStatus(f.commercialStatus),
+  }));
+  const prices: NonNullable<Plan["prices"]> = {};
+  if (monthly) {
+    prices.MONTHLY = {
+      planPriceId: monthly.id,
+      amountCents: monthly.amountCents,
+      currency: "COP",
+      version: monthly.version,
+      publicationStatus: monthly.publicationStatus,
+    };
+  }
+  if (yearly) {
+    prices.ANNUAL = {
+      planPriceId: yearly.id,
+      amountCents: yearly.amountCents,
+      currency: "COP",
+      version: yearly.version,
+      publicationStatus: yearly.publicationStatus,
+    };
+  }
+  if (perpetual) {
+    prices.PERPETUAL = {
+      planPriceId: perpetual.id,
+      amountCents: perpetual.amountCents,
+      currency: "COP",
+      version: perpetual.version,
+      publicationStatus: perpetual.publicationStatus,
+    };
+  }
   return {
     id: plan.id,
     slug: plan.slug,
@@ -258,25 +324,33 @@ function mapPlan(plan: ApiPlan): Plan {
     ...(primary
       ? { planPriceId: primary.id, priceVersion: primary.version }
       : {}),
-    highlights: (plan.features ?? []).map((f) => f.label).slice(0, 6),
+    prices,
+    highlights: features.map((f) => f.label).slice(0, 6),
+    features,
     status: mapFeatureStatus(plan.publicationStatus),
     featured: plan.publicationStatus === "PUBLISHED" || plan.publicationStatus === "DRAFT",
+    supportNote: "Soporte comercial según el plan contratado",
+    licensesPerUnit: plan.licensesPerUnit ?? 1,
     ...(yearly ? { priceYearly: { amountCents: yearly.amountCents, currency: "COP" as const } } : {}),
+    ...(perpetual
+      ? { pricePerpetual: { amountCents: perpetual.amountCents, currency: "COP" as const } }
+      : {}),
   };
 }
 
 function mapProduct(product: ApiProduct): Equipment {
   const variant =
     product.variants?.find((v) => v.publicationStatus === "PUBLISHED") ?? product.variants?.[0];
+  const imageFromApi = product.images?.[0]?.url;
   return {
     id: product.id,
     slug: product.slug,
     name: product.name,
-    category: product.kind ?? "Equipo",
+    category: product.category?.name ?? product.category?.slug ?? product.kind ?? "Equipo",
     summary: product.description.slice(0, 160),
     description: product.description,
     price: { amountCents: variant?.amountCents ?? 0, currency: "COP" },
-    image: `/images/hardware/${guessHardwareImage(product.slug)}`,
+    image: imageFromApi || `/images/hardware/${guessHardwareImage(product.slug, product.category?.slug)}`,
     status: mapFeatureStatus(product.publicationStatus),
     featured: product.publicationStatus === "PUBLISHED" || product.publicationStatus === "DRAFT",
     specs: (product.variants ?? []).map((v) => v.name),
@@ -304,12 +378,26 @@ function mapKit(kit: ApiKit): Equipment {
   };
 }
 
-function guessHardwareImage(slug: string): string {
-  if (slug.includes("impresora")) return "impresora-termica.svg";
-  if (slug.includes("lector") || slug.includes("barra")) return "lector-barras.svg";
-  if (slug.includes("balanza")) return "balanza.svg";
-  if (slug.includes("cajon") || slug.includes("monedero")) return "cajon-monedero.svg";
+function guessHardwareImage(slug: string, categorySlug?: string): string {
+  const hay = `${slug} ${categorySlug ?? ""}`.toLowerCase();
+  if (hay.includes("impresora")) return "impresora-termica.svg";
+  if (hay.includes("lector") || hay.includes("barra")) return "lector-barras.svg";
+  if (hay.includes("balanza")) return "balanza.svg";
+  if (hay.includes("cajon") || hay.includes("monedero")) return "cajon-monedero.svg";
   return "terminal-tactil.svg";
+}
+
+function mapPromotion(promo: ApiPromotion): Promotion {
+  return {
+    id: promo.id,
+    slug: promo.code.toLowerCase(),
+    title: promo.name,
+    summary: promo.description ?? promo.name,
+    ...(promo.validUntil ? { validUntil: promo.validUntil } : {}),
+    ctaHref: promo.ctaHref ?? "/promociones",
+    ctaLabel: promo.ctaLabel ?? "Ver promoción",
+    status: mapFeatureStatus(promo.publicationStatus),
+  };
 }
 
 function mapZone(zone: ApiZone): CoverageCity {
@@ -344,10 +432,18 @@ function mapPaymentStatus(status?: string): CheckoutStatus {
 export async function getSettings(): Promise<FetchResult<SiteSettings>> {
   const data = await apiFetch<ApiSettings>("/v1/content/settings");
   if (data) {
+    const promoBar =
+      data.promoBannerMessage
+        ? {
+            message: data.promoBannerMessage,
+            ...(data.promoBannerHref ? { href: data.promoBannerHref } : {}),
+            ...(data.promoBannerCta ? { cta: data.promoBannerCta } : {}),
+          }
+        : null;
     return {
       source: "api",
       data: {
-        ...(draftSettings.promoBar ? { promoBar: draftSettings.promoBar } : { promoBar: null }),
+        promoBar,
         ...(data.whatsappNumber
           ? { whatsappNumber: data.whatsappNumber.replace(/_DEV_PLACEHOLDER$/, "") }
           : {}),
@@ -391,9 +487,9 @@ export async function getEquipment(slug: string): Promise<FetchResult<Equipment 
 }
 
 export async function getPromotions(): Promise<FetchResult<Promotion[]>> {
-  // commercial-api exposes coupon validation, not a public promo list yet.
-  if (!isDevelopment()) {
-    return { data: [], source: "api" };
+  const data = await apiFetch<ApiPromotion[]>("/v1/promotions");
+  if (data) {
+    return { data: data.map(mapPromotion), source: "api" };
   }
   return draftOrThrow(draftPromotions);
 }
@@ -438,13 +534,22 @@ export async function getFaq(): Promise<FetchResult<FaqItem[]>> {
 export async function getFeatures(): Promise<FetchResult<FeatureFlag[]>> {
   const plans = await apiFetch<ApiPlan[]>("/v1/catalog/plans");
   if (plans?.length) {
+    const seen = new Set<string>();
     const features = plans.flatMap((plan) =>
-      (plan.features ?? []).map((feature, index) => ({
-        id: `${plan.slug}-${feature.label}-${index}`,
-        name: feature.label,
-        description: `${plan.name}: ${feature.label}`,
-        status: mapFeatureStatus(feature.commercialStatus),
-      })),
+      (plan.features ?? [])
+        .filter((feature) => !feature.code || !HIDDEN_PUBLIC_FEATURE_CODES.has(feature.code))
+        .map((feature, index) => {
+          const key = feature.code ?? feature.label;
+          if (seen.has(key)) return null;
+          seen.add(key);
+          return {
+            id: `${plan.slug}-${key}-${index}`,
+            name: feature.label,
+            description: feature.description ?? `${plan.name}: ${feature.label}`,
+            status: mapFeatureStatus(feature.commercialStatus),
+          };
+        })
+        .filter((item): item is NonNullable<typeof item> => Boolean(item)),
     );
     if (features.length) return { data: features, source: "api" };
   }
@@ -544,6 +649,69 @@ export async function submitContact(payload: Record<string, string>): Promise<{ 
   if (data) return { ok: true, ...(data.id ? { id: data.id } : {}) };
   if (isDevelopment()) return { ok: true, id: `draft-contact-${Date.now()}` };
   return { ok: false };
+}
+
+export type LeadPayload = {
+  fullName: string;
+  email: string;
+  phoneE164?: string;
+  companyName?: string;
+  businessType?: string;
+  source?: string;
+  notes?: string;
+  planId?: string;
+  modality?: "MONTHLY" | "ANNUAL" | "PERPETUAL";
+  solutionType?: "SOFTWARE" | "COMPLETE";
+  departmentCode?: string;
+  cityCode?: string;
+  cajaQty?: number;
+  branchQty?: number;
+  consentDataTreatment: boolean;
+  consentCommercial?: boolean;
+};
+
+export async function submitLead(payload: LeadPayload): Promise<{ ok: boolean; id?: string; error?: string }> {
+  const res = await apiFetchRaw("/v1/crm/leads", {
+    method: "POST",
+    body: JSON.stringify(payload),
+    cache: "no-store",
+  });
+  if (res.ok && res.body && typeof res.body === "object" && "id" in res.body) {
+    return { ok: true, id: String((res.body as { id: string }).id) };
+  }
+  const errBody = res.body as { message?: string; code?: string } | null;
+  return {
+    ok: false,
+    ...(errBody?.message || errBody?.code
+      ? { error: errBody.message ?? errBody.code }
+      : { error: `HTTP_${res.status}` }),
+  };
+}
+
+export type DepartmentWithCities = {
+  id: string;
+  name: string;
+  cities: Array<{ id: string; name: string }>;
+};
+
+export async function getDepartments(): Promise<FetchResult<DepartmentWithCities[]>> {
+  const data = await apiFetch<DepartmentWithCities[]>("/v1/coverage/departments");
+  if (data?.length) return { data, source: "api" };
+  return draftOrThrow([
+    {
+      id: "11",
+      name: "Bogotá, D.C.",
+      cities: [{ id: "11001", name: "Bogotá, D.C." }],
+    },
+    {
+      id: "05",
+      name: "Antioquia",
+      cities: [
+        { id: "05001", name: "Medellín" },
+        { id: "05088", name: "Bello" },
+      ],
+    },
+  ]);
 }
 
 export async function quoteCart(items: CartItem[]): Promise<FetchResult<Cart>> {
@@ -685,13 +853,25 @@ export async function getCheckoutStatus(
   return null;
 }
 
+function adminAuthHeaders(token?: string): Record<string, string> {
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  if (allowAdminTestFixture()) {
+    headers["X-Admin-Test-Fixture"] = "GLOBAL_SUPERADMIN";
+  }
+  return headers;
+}
+
 export async function getAdminSession(token?: string): Promise<AdminSession> {
+  if (allowAdminTestFixture()) {
+    return { authenticated: true, role: "GLOBAL", displayName: "Fixture GLOBAL (prueba)" };
+  }
   if (!token) return { authenticated: false, role: "NONE" };
   // Probe a GLOBAL-guarded endpoint; no dedicated /session route yet.
   const url = `${getApiUrl()}/v1/admin/catalog/plans`;
   try {
     const response = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+      headers: adminAuthHeaders(token),
       cache: "no-store",
     });
     if (response.ok) {
@@ -704,9 +884,33 @@ export async function getAdminSession(token?: string): Promise<AdminSession> {
 }
 
 export async function adminFetch<T>(path: string, token?: string): Promise<T | null> {
-  if (!token) return null;
+  if (!token && !allowAdminTestFixture()) return null;
   return apiFetch<T>(path, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: adminAuthHeaders(token),
     cache: "no-store",
   });
+}
+
+/** Browser-side admin mutations (fixture header only when NEXT_PUBLIC_ALLOW_ADMIN_TEST_FIXTURE=1). */
+export async function adminMutate<T>(
+  path: string,
+  init: { method: "POST" | "PATCH" | "DELETE"; body?: unknown; token?: string },
+): Promise<{ ok: boolean; status: number; data: T | null; error?: string }> {
+  const res = await apiFetchRaw(path, {
+    method: init.method,
+    headers: {
+      ...adminAuthHeaders(init.token),
+      "Content-Type": "application/json",
+    },
+    ...(init.body !== undefined ? { body: JSON.stringify(init.body) } : {}),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const err =
+      res.body && typeof res.body === "object" && "message" in (res.body as object)
+        ? JSON.stringify((res.body as { message: unknown }).message)
+        : `HTTP ${res.status}`;
+    return { ok: false, status: res.status, data: null, error: err };
+  }
+  return { ok: true, status: res.status, data: res.body as T };
 }

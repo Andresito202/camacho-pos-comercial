@@ -266,18 +266,31 @@ model ContactRequest {
 }
 
 model Lead {
-  id          String     @id @default(cuid())
-  customerId  String?
-  email       String
-  fullName    String
-  phoneE164   String?
-  companyName String?
-  source      String?
-  status      LeadStatus @default(NEW)
-  notes       String?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  deletedAt   DateTime?
+  id                    String     @id @default(cuid())
+  customerId            String?
+  email                 String
+  fullName              String
+  phoneE164             String?
+  companyName           String?
+  businessType          String?
+  source                String?
+  status                LeadStatus @default(NEW)
+  notes                 String?
+  /// Catalog plan id when the lead originates from /planes hire flow
+  planId                String?
+  /// MONTHLY | ANNUAL | PERPETUAL
+  modality              String?
+  /// SOFTWARE | COMPLETE
+  solutionType          String?
+  departmentCode        String?
+  cityCode              String?
+  cajaQty               Int?
+  branchQty             Int?
+  consentDataTreatment  Boolean    @default(false)
+  consentCommercial     Boolean    @default(false)
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+  deletedAt             DateTime?
 
   customer   CommercialCustomer? @relation(fields: [customerId], references: [id])
   activities LeadActivity[]
@@ -285,6 +298,7 @@ model Lead {
 
   @@index([email])
   @@index([status])
+  @@index([planId])
   @@index([deletedAt])
 }
 
@@ -1031,6 +1045,9 @@ model SiteSettings {
   whatsappNumber     String // must be clearly marked DEV placeholder when provisional
   supportEmail       String
   logoUrl            String?
+  promoBannerMessage String?
+  promoBannerHref    String?
+  promoBannerCta     String?
   publicationStatus  PublicationStatus @default(DRAFT)
   updatedAt          DateTime @updatedAt
   createdAt          DateTime @default(now())

@@ -33,9 +33,24 @@ export const EnvSchema = z
 
     WHATSAPP_BUSINESS_NUMBER: z.string().default("573000000000_DEV_PLACEHOLDER"),
     PUBLIC_SITE_ORIGIN: z.string().url().default("https://camachoposcolombia.com"),
+
+    /**
+     * OPTIONAL staging-only AdminGuard fixture. NEVER enable in production.
+     * When "1" and NODE_ENV !== "production", AdminGuard accepts
+     * header `X-Admin-Test-Fixture: GLOBAL_SUPERADMIN` for UI demos without Central.
+     * Default: unset / false — fail-closed.
+     */
+    ALLOW_ADMIN_TEST_FIXTURE: boolFromEnv.default(false),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === "production") {
+      if (env.ALLOW_ADMIN_TEST_FIXTURE) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "ALLOW_ADMIN_TEST_FIXTURE must never be enabled when NODE_ENV=production",
+          path: ["ALLOW_ADMIN_TEST_FIXTURE"],
+        });
+      }
       if (env.FACTUS_PAY_MODE === "PRODUCTION" && !env.FACTUS_PAY_PRODUCTION_ENABLED) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,

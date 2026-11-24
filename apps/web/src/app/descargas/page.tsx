@@ -23,8 +23,8 @@ export default function DescargasPage() {
         <article className="border border-[var(--border)] bg-white/70 p-5">
           <h2 className="font-serif text-2xl">Electron — Windows</h2>
           <p className="mt-2 text-sm text-[var(--steel)]">
-            Tras contratar, el canal comercial entrega el instalador firmado del POS Desktop y la guía del POS Local Service
-            (único writer SQLite). Requiere host Windows del kit homologado.
+            Tras contratar, el canal comercial entrega el instalador firmado de la aplicación de caja para Windows y la
+            guía de puesta en marcha. Requiere un equipo Windows del kit homologado.
           </p>
           <p className="mt-3 text-xs text-[var(--muted)]">El binario no se publica en abierto sin licencia activa.</p>
         </article>
@@ -37,7 +37,7 @@ export default function DescargasPage() {
         <article className="border border-[var(--yellow)] bg-[color-mix(in_srgb,var(--yellow)_14%,white)] p-5">
           <h2 className="font-serif text-2xl">Inicio de sesión</h2>
           <p className="mt-2 text-sm text-[var(--steel)]">
-            Un solo botón visible en el sitio lleva a Central Authority cuando está configurada.
+            Un solo botón visible en el sitio lleva al acceso de cuenta cuando está configurado.
           </p>
           {login.href ? (
             <a href={login.href} className="mt-4 inline-block"><Button>Iniciar sesión en Central</Button></a>

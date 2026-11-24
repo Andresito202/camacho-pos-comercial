@@ -6,7 +6,7 @@ const COLUMNS = [
     title: "Producto",
     links: [
       { href: "/software-pos", label: "Software POS" },
-      { href: "/planes", label: "Planes" },
+      { href: "/planes", label: "Planes y precios" },
       { href: "/equipos", label: "Equipos" },
       { href: "/descargas", label: "Descargas" },
     ],
@@ -48,7 +48,7 @@ export function SiteFooter() {
           <Image src="/brand/logo-stacked.png" alt="Camacho POS Colombia" width={120} height={120} className="mb-4 rounded-lg bg-white/5 p-2" />
           <p className="font-serif text-2xl">Camacho POS Colombia</p>
           <p className="mt-3 max-w-xs text-sm text-white/70">
-            Contabilidad y precisión siempre. Software local-first y kits de hardware para el comercio colombiano.
+            Contabilidad y precisión siempre. Software POS y kits de hardware para el comercio colombiano.
           </p>
         </div>
         {COLUMNS.map((column) => (

@@ -37,7 +37,7 @@ export function Modal({ open, onClose, title, children, className, footer }: Mod
     <dialog
       ref={dialogRef}
       className={cn(
-        "fixed inset-0 z-50 m-auto w-[min(92vw,34rem)] rounded-xl border border-[var(--border)] bg-[var(--ivory)] p-0 text-[var(--navy)] shadow-2xl open:flex open:flex-col backdrop:bg-[color-mix(in_srgb,var(--navy)_55%,transparent)]",
+        "fixed inset-0 z-50 m-auto w-[min(94vw,42rem)] max-h-[min(92vh,52rem)] overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--ivory)] p-0 text-[var(--navy)] shadow-2xl open:flex open:flex-col backdrop:bg-[color-mix(in_srgb,var(--navy)_55%,transparent)]",
         className,
       )}
       aria-labelledby={titleId}

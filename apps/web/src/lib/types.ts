@@ -10,6 +10,23 @@ export type Money = {
   currency: "COP";
 };
 
+export type BillingInterval = "MONTHLY" | "ANNUAL" | "PERPETUAL";
+
+export type PlanFeature = {
+  code: string;
+  label: string;
+  description?: string;
+  commercialStatus: FeatureStatus;
+};
+
+export type PlanPriceOption = {
+  planPriceId: string;
+  amountCents: number;
+  currency: "COP";
+  version: number;
+  publicationStatus?: string;
+};
+
 export type Plan = {
   id: string;
   slug: string;
@@ -18,15 +35,25 @@ export type Plan = {
   description: string;
   priceMonthly: Money;
   priceYearly?: Money;
+  pricePerpetual?: Money;
   /** Primary price interval shown on cards (MONTHLY | ANNUAL | PERPETUAL). */
-  primaryInterval?: "MONTHLY" | "ANNUAL" | "PERPETUAL";
+  primaryInterval?: BillingInterval;
   /** Server plan-price id used by POST /v1/cart/:token/items */
   planPriceId?: string;
   priceVersion?: number;
+  prices?: {
+    MONTHLY?: PlanPriceOption;
+    ANNUAL?: PlanPriceOption;
+    PERPETUAL?: PlanPriceOption;
+  };
   highlights: string[];
+  features?: PlanFeature[];
   includesHardwareHint?: string;
   status: FeatureStatus;
   featured?: boolean;
+  /** Approximate support note for commercial cards */
+  supportNote?: string;
+  licensesPerUnit?: number;
 };
 
 export type Equipment = {

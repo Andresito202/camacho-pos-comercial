@@ -19,9 +19,9 @@ export function featureStatusLabel(status: FeatureStatus): string {
     case "proximamente":
       return "Próximamente";
     case "borrador":
-      return "Borrador";
+      return "Precio de referencia";
     case "no_publicada":
-      return "No publicada";
+      return "Pendiente de publicación";
   }
 }
 

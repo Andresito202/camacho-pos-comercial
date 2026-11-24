@@ -21,7 +21,7 @@ import { buildMetadata, faqJsonLd, JsonLd } from "@/lib/seo";
 export const metadata = buildMetadata({
   title: "Camacho POS Colombia | Software POS y kits para tu negocio",
   description:
-    "Vende, controla y haz crecer tu negocio con Camacho POS Colombia. Software local-first, planes comerciales y kits de equipos.",
+    "Vende, controla y haz crecer tu negocio con Camacho POS Colombia. Software POS, planes comerciales y kits de equipos para el comercio colombiano.",
   path: "/",
 });
 
@@ -71,8 +71,8 @@ export default async function HomePage() {
               Vende, controla y haz crecer tu negocio con Camacho POS Colombia
             </h1>
             <p className="mt-5 max-w-xl text-lg text-white/75">
-              Software POS local-first y kits de equipos para tiendas, supermercados, droguerías, avícolas,
-              panaderías y pastelerías. Contrata en línea; el cajero opera en Electron o Android.
+              Software POS y kits de equipos para tiendas, supermercados, droguerías, avícolas, panaderías y
+              pastelerías. Contrata en línea; el cajero opera en la aplicación instalada en Windows o Android.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link href="/planes">
@@ -106,13 +106,13 @@ export default async function HomePage() {
       <Section
         eyebrow="Beneficios"
         title="Operación de mostrador sin drama de conectividad"
-        lead="Local-first, roles claros y estados de capacidad transparentes. No vendemos lo que aún no está listo."
+        lead="Vende aunque se interrumpa internet, con roles claros y estados de capacidad transparentes. No vendemos lo que aún no está listo."
       >
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {[
             {
               title: "Venta aunque falle Internet",
-              body: "El POS Local Service escribe en SQLite/WAL. La fila no se detiene por un corte breve.",
+              body: "Tu caja sigue operando en el local. La fila no se detiene por un corte breve de red.",
             },
             {
               title: "Roles sin confusión",
@@ -120,7 +120,7 @@ export default async function HomePage() {
             },
             {
               title: "Estados honestos",
-              body: "Disponible, En certificación, Próximamente o No publicada. Sin fingir disponibilidad.",
+              body: "Disponible, En certificación, Próximamente o Pendiente de publicación. Sin fingir disponibilidad.",
             },
           ].map((item) => (
             <article key={item.title} className="border-l-4 border-[var(--teal)] pl-4">
@@ -230,7 +230,7 @@ export default async function HomePage() {
         </div>
       </Section>
 
-      <Section eyebrow="Planes" title="Licencias claras, precios en COP" lead="Los planes se cargan desde commercial-api. Si el API no responde en desarrollo, verás preview DRAFT.">
+      <Section eyebrow="Planes" title="Licencias claras, precios en COP" lead="Precios en pesos colombianos. Los precios de referencia se confirman al publicar la oferta comercial.">
         <div className="grid gap-5 lg:grid-cols-3">
           {plans.data.filter((plan) => plan.status !== "no_publicada").slice(0, 3).map((plan) => (
             <PlanCard key={plan.id} plan={plan} />
