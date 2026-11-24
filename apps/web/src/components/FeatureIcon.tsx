@@ -1,6 +1,6 @@
 import Image from "next/image";
 
-const ICONS = [
+export const FEATURE_ICON_NAMES = [
   "caja",
   "inventario",
   "balanza",
@@ -12,7 +12,7 @@ const ICONS = [
   "reportes",
 ] as const;
 
-export type FeatureIconName = (typeof ICONS)[number];
+export type FeatureIconName = (typeof FEATURE_ICON_NAMES)[number];
 
 export function FeatureIcon({
   name,
