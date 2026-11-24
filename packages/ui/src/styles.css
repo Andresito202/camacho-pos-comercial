@@ -3,7 +3,10 @@
   --yellow: #f7c83c;
   --steel: #25425a;
   --ivory: #f6f5f0;
-  --teal: #168177;
+  /* Darkened for ≥4.5:1 on ivory / teal-tint section backgrounds (LH color-contrast). */
+  --teal: #127068;
+  /* Light teal for navy surfaces (≥4.5:1 on #101c2d). */
+  --teal-on-dark: #5ed9cd;
   --muted: #3f4f5f;
   --white: #ffffff;
   --danger: #b42318;

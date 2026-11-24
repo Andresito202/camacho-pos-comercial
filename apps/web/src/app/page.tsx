@@ -65,7 +65,7 @@ export default async function HomePage() {
 
       <section className="relative overflow-hidden bg-[var(--navy)] text-[var(--ivory)]">
         <div
-          className="absolute inset-0"
+          className="pointer-events-none absolute inset-0"
           style={{
             background:
               "radial-gradient(ellipse at 12% 18%, rgba(247,200,60,0.42), transparent 46%), radial-gradient(ellipse at 88% 8%, rgba(22,129,119,0.28), transparent 40%), linear-gradient(160deg, #0c1624 0%, #101c2d 55%, #15253a 100%)",
@@ -89,26 +89,26 @@ export default async function HomePage() {
               Software y equipos para tiendas, supermercados, droguerías, avícolas, salsamentarias, panaderías y
               pastelerías. Contrata en línea; tu caja opera en Windows o Android.
             </p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Link href="/planes">
+            <div className="mt-8 flex flex-wrap gap-4">
+              <Link href="/planes" className="inline-flex">
                 <Button size="lg">Ver planes</Button>
               </Link>
-              <Link href="/equipos">
+              <Link href="/equipos" className="inline-flex">
                 <Button size="lg" variant="outline" className="border-[var(--ivory)] text-[var(--ivory)] hover:bg-white/10">
                   Comprar equipos
                 </Button>
               </Link>
-              <Link href="/planes?solucion=completo">
+              <Link href="/planes?solucion=completo" className="inline-flex">
                 <Button size="lg" variant="ghost" className="text-[var(--yellow)] hover:bg-white/10">
                   POS completo
                 </Button>
               </Link>
-              <Link href="/solicitar-demo">
+              <Link href="/solicitar-demo" className="inline-flex">
                 <Button size="lg" variant="ghost" className="text-white/85 hover:bg-white/10">
                   Solicitar demo
                 </Button>
               </Link>
-              <Link href="/contacto">
+              <Link href="/contacto" className="inline-flex">
                 <Button size="lg" variant="ghost" className="text-white/85 hover:bg-white/10">
                   WhatsApp / asesor
                 </Button>
@@ -395,16 +395,16 @@ export default async function HomePage() {
       </Section>
 
       <Section tone="navy" eyebrow="Contacto" title="Hablemos de tu punto de venta" lead="Asesoría comercial, demos y seguimiento de pedidos.">
-        <div className="flex flex-wrap gap-3">
-          <Link href="/contacto">
+        <div className="flex flex-wrap gap-4">
+          <Link href="/contacto" className="inline-flex">
             <Button size="lg">Contacto</Button>
           </Link>
-          <Link href="/solicitar-demo">
+          <Link href="/solicitar-demo" className="inline-flex">
             <Button size="lg" variant="outline" className="border-[var(--ivory)] text-[var(--ivory)]">
               Solicitar demo
             </Button>
           </Link>
-          <Link href="/contratar">
+          <Link href="/contratar" className="inline-flex">
             <Button size="lg" variant="ghost" className="text-[var(--yellow)]">
               Contratar ahora
             </Button>

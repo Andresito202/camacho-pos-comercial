@@ -54,17 +54,17 @@ export function SiteHeader({
             <Link
               key={item.href}
               href={item.href}
-              className="text-sm font-semibold text-[var(--steel)] hover:text-[var(--navy)]"
+              className="inline-flex min-h-11 items-center text-sm font-semibold text-[var(--steel)] hover:text-[var(--navy)]"
             >
               {item.label}
             </Link>
           ))}
         </nav>
 
-        <div className="flex items-center gap-1.5 sm:gap-2">
+        <div className="flex items-center gap-2 sm:gap-2.5">
           <Link
             href="/carrito"
-            className="relative rounded-md px-2.5 py-2 text-sm font-medium text-[var(--navy)] hover:bg-[color-mix(in_srgb,var(--navy)_6%,transparent)]"
+            className="relative inline-flex min-h-11 items-center rounded-md px-2.5 py-2 text-sm font-medium text-[var(--navy)] hover:bg-[color-mix(in_srgb,var(--navy)_6%,transparent)]"
             aria-label={`Carrito${count ? `, ${count} artículos` : ""}`}
           >
             Carrito

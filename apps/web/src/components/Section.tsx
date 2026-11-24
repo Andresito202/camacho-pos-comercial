@@ -29,7 +29,12 @@ export function Section({
       <div className="mx-auto max-w-6xl">
         <div className="mb-10 max-w-3xl">
           {eyebrow ? (
-            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--teal)]">
+            <p
+              className={cn(
+                "mb-3 text-xs font-semibold uppercase tracking-[0.18em]",
+                tone === "navy" ? "text-[var(--teal-on-dark)]" : "text-[var(--teal)]",
+              )}
+            >
               {eyebrow}
             </p>
           ) : null}
