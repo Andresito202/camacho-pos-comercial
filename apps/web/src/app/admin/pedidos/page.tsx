@@ -1,33 +1,46 @@
+import { cookies } from "next/headers";
 import { Table } from "@camacho-pos/ui";
 import { adminFetch } from "@/lib/api";
-import { cookies } from "next/headers";
 import { ADMIN_TOKEN_COOKIE } from "@/lib/auth";
+import { formatMoney } from "@/lib/format";
 
-type AdminRow = { id: string; name: string; status: string };
+type OrderRow = {
+  id: string;
+  orderNumber: string;
+  status: string;
+  totalCents: number;
+  createdAt: string;
+  customer?: { fullName?: string; email?: string } | null;
+};
 
 export default async function AdminPedidosPage() {
   const token = (await cookies()).get(ADMIN_TOKEN_COOKIE)?.value;
-  const raw = (await adminFetch<Array<{ id: string; name?: string; status?: string; publicationStatus?: string }>>("/v1/admin/pedidos", token)) ?? [];
-  const rows: AdminRow[] = raw.map((row) => ({
-    id: row.id,
-    name: row.name ?? row.id,
-    status: row.status ?? row.publicationStatus ?? "—",
-  }));
+  const orders = (await adminFetch<OrderRow[]>("/v1/admin/pedidos", token)) ?? [];
 
   return (
     <div>
       <h1 className="font-serif text-3xl">Pedidos</h1>
-      <p className="mt-2 text-[var(--muted)]">Pedidos y contrataciones.</p>
+      <p className="mt-2 text-[var(--muted)]">Orders desde PostgreSQL comercial.</p>
       <div className="mt-8 bg-white/70 p-4">
         <Table
-          caption="Datos desde commercial-api (stub)."
-          rows={rows}
+          caption="Orders"
+          rows={orders}
           columns={[
-            { key: "name", header: "Nombre", render: (row: AdminRow) => row.name },
-            { key: "status", header: "Estado", render: (row: AdminRow) => row.status },
-            { key: "id", header: "Id", render: (row: AdminRow) => row.id },
+            { key: "orderNumber", header: "Número", render: (r) => r.orderNumber },
+            {
+              key: "customer",
+              header: "Cliente",
+              render: (r) => r.customer?.fullName ?? r.customer?.email ?? "—",
+            },
+            { key: "status", header: "Estado", render: (r) => r.status },
+            {
+              key: "total",
+              header: "Total",
+              render: (r) => formatMoney({ amountCents: r.totalCents, currency: "COP" }),
+            },
+            { key: "createdAt", header: "Creado", render: (r) => r.createdAt.slice(0, 10) },
           ]}
-          empty="Sin datos del API o endpoint admin aún no materializado. El acceso GLOBAL ya fue verificado en servidor."
+          empty="Sin pedidos."
         />
       </div>
     </div>

@@ -13,7 +13,7 @@ These records are a recommended layout for when DNS is configured by the domain 
 | `api.camachoposcolombia.com` | Public commercial-api | commercial-api (:4000) |
 | `staging.camachoposcolombia.com` | Staging portal | staging stack; **noindex** |
 
-Optional later (still proposals): `admin.` (if split), `status.`, media CDN hostname.
+Optional later (still proposals): `admin.` (if split), `status.`, media CDN hostname, and **`central.camachoposcolombia.com`** (proposed Central Authority host in commercial mission — **not approved wiring**, not hardcoded; login uses `CENTRAL_AUTHORITY_ORIGIN` only). See `docs/architecture/domains.md`.
 
 ## Proposed record types (illustrative)
 

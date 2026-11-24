@@ -4,7 +4,7 @@ Captured on branch `feat/commercial-platform-foundation` at **2026-11-24T03:15:4
 
 Environment:
 
-- `DATABASE_URL=postgresql://comercial:comercial_dev@127.0.0.1:5432/camacho_pos_comercial?schema=public`
+- `DATABASE_URL=postgresql://comercial:***@127.0.0.1:5432/camacho_pos_comercial?schema=public`
 - commercial-api on `http://127.0.0.1:4000` (`NODE_ENV=development`)
 - web (Next.js) on `http://127.0.0.1:3000`
 - migrate deploy + seed applied before smoke (`pnpm db:setup`)
@@ -12,7 +12,7 @@ Environment:
 ## How to start (local)
 
 ```bash
-export DATABASE_URL='postgresql://comercial:comercial_dev@127.0.0.1:5432/camacho_pos_comercial?schema=public'
+export DATABASE_URL='postgresql://comercial:***@127.0.0.1:5432/camacho_pos_comercial?schema=public'
 export PORT=4000
 pnpm db:setup
 pnpm --filter @camacho-pos-comercial/commercial-api start:dev

@@ -200,6 +200,27 @@ describe("commercial-api critical paths", () => {
     expect(errorCode(res.json())).toBe("PENDING_CENTRAL_CREDENTIALS");
   });
 
+  it("admin test fixture remains disabled by default (fail-closed)", async () => {
+    const res = await inject("GET", "/v1/admin/catalog/plans", {
+      headers: { "x-admin-test-fixture": "GLOBAL_SUPERADMIN" },
+    });
+    expect(res.statusCode).toBe(401);
+    expect(errorCode(res.json())).toBe("PENDING_CENTRAL_CREDENTIALS");
+  });
+
+  it("lists active promotions filtered by time window", async () => {
+    const res = await inject("GET", "/v1/promotions");
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as Array<{ code: string; active: boolean }>;
+    expect(Array.isArray(body)).toBe(true);
+    // FUTURE-SAMPLE is scheduled ahead and must not appear as active-now
+    expect(body.some((p) => p.code === "FUTURE-SAMPLE")).toBe(false);
+    // At least one staging campaign with a current Bogota window should be present after seed
+    if (body.length) {
+      expect(body.every((p) => p.active === true)).toBe(true);
+    }
+  });
+
   it("health check works", async () => {
     const res = await inject("GET", "/health");
     expect(res.statusCode).toBe(200);

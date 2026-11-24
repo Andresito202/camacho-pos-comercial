@@ -48,8 +48,13 @@ flowchart LR
 | commercial-api | 4000 |
 | postgres (compose host map) | **5433** → container 5432 |
 
+## Domains
+
+See `docs/architecture/domains.md`: `camachoposcolombia.com` is the **approved** institutional apex; `central.camachoposcolombia.com` is a **proposal** only. Login uses `CENTRAL_AUTHORITY_ORIGIN` / `NEXT_PUBLIC_CENTRAL_AUTHORITY_ORIGIN` exclusively.
+
 ## Fail-closed notes
 
 - Production Factus credentials missing → refuse production payment mode.
 - WhatsApp `DEV_PLACEHOLDER` → forbidden when `NODE_ENV=production`.
 - Web production runtime does not invent sellable catalog when API is down (draft fallback is for development / build only).
+- Admin routes fail closed without Central; optional `ALLOW_ADMIN_TEST_FIXTURE` is refused when `NODE_ENV=production`.
