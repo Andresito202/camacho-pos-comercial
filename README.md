@@ -102,11 +102,18 @@ CI green is not production evidence. See `docs/commercial/acceptance-status.md`.
 - Docker may be missing on some VMs; compose files are still the canonical definition.
 - Paid order → Central provisioning end-to-end is not claimed until observed with real dependencies.
 
+## Owner visual review
+
+There is **no live staging URL** until DNS for `staging.camachoposcolombia.com` is published.  
+To review the full portal locally (Windows Docker / PostgreSQL), Superadmin fixture (dev-only), Central contracts, Factus sandbox, and domain inventory:
+
+→ **`docs/commercial/owner-visual-review.md`**
+
 ## Docs map
 
 - Architecture: `docs/architecture/`
 - Security: `docs/security/`
-- Commercial honesty: `docs/commercial/`
+- Commercial honesty: `docs/commercial/` (incl. owner visual review + unlock blockers)
 - Testing: `docs/testing/strategy.md`
 - Deploy: `infrastructure/deployment/`
 - Competitive notes (no copying): `docs/competitive-research/`
