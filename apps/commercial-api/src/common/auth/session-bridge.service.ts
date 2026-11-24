@@ -73,9 +73,8 @@ export class SessionBridgeService {
       };
     }
 
-    // Test/dev escape hatch: explicit bridge token shape used only when Central is configured
-    // and bridge enabled. Real deployment must call Central HTTPS contracts.
-    if (token.startsWith("central-test:")) {
+    // Non-production escape hatch ONLY. Never honored when NODE_ENV=production.
+    if (this.config.env.NODE_ENV !== "production" && token.startsWith("central-test:")) {
       const role = token.slice("central-test:".length) as CommercialRole;
       if (role === "SUPERADMIN_GLOBAL" || role === "BUSINESS_ADMIN") {
         return {

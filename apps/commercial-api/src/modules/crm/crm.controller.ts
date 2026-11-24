@@ -1,10 +1,11 @@
-import { Body, Controller, Get, Headers, Inject, Param, Post, Req } from "@nestjs/common";
+import { Body, Controller, Get, Headers, Inject, Param, Post, Req, UseGuards } from "@nestjs/common";
 import {
   ContactRequestSchema,
   DemoRequestSchema,
   LeadCreateSchema,
   TrialRequestSchema,
 } from "@camacho-pos-comercial/contracts";
+import { AdminGuard } from "../../common/auth/admin.guard.js";
 import { RateLimitService } from "../../common/rate-limit/rate-limit.service.js";
 import { CaptchaService } from "../../common/security/captcha.service.js";
 import { CsrfService } from "../../common/security/csrf.service.js";
@@ -96,6 +97,13 @@ export class CrmController {
       webhookKey,
       centralLicenseRef: payload.centralLicenseRef ?? "",
     });
+  }
+
+  /** Admin/GLOBAL: ask Central to issue TRIAL 120h and callback activation (no local simulation). */
+  @Post("trial/:id/request-central-issue")
+  @UseGuards(AdminGuard)
+  async requestCentralIssue(@Param("id") id: string) {
+    return this.crm.requestCentralTrialIssue(id);
   }
 
   @Post("trial/expire-due")

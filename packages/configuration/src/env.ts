@@ -18,6 +18,11 @@ export const EnvSchema = z
     CENTRAL_SESSION_BRIDGE_ENABLED: boolFromEnv.default(false),
     /** Path commercial-api POSTs license outbox payloads to Central. Stub until Central exposes it. */
     CENTRAL_PROVISIONING_PATH: z.string().default("/v1/commercial/provisioning"),
+    /**
+     * Shared service key with Central commercial portal bridge
+     * (`X-Central-Commercial-Bridge-Key`). Required for live provisioning/trial issue calls.
+     */
+    COMMERCIAL_BRIDGE_KEY: z.string().optional().default(""),
 
     /**
      * Configured environment intent. Resolved runtime gate is MOCK | SANDBOX | PRODUCTION

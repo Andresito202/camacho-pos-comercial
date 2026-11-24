@@ -140,6 +140,20 @@ export class ProvisioningService {
     }
 
     const path = this.config.env.CENTRAL_PROVISIONING_PATH || "/v1/commercial/provisioning";
+    const bridgeKey = this.config.env.COMMERCIAL_BRIDGE_KEY?.trim() ?? "";
+    if (!bridgeKey || bridgeKey.length < 32) {
+      await this.prisma.provisioningRequest.update({
+        where: { id },
+        data: {
+          status: "PENDING",
+          lastError: "PENDING_COMMERCIAL_BRIDGE_KEY",
+          attemptCount: item.attemptCount + 1,
+          nextRetryAt: new Date(Date.now() + 60_000 * Math.min(60, item.attemptCount + 1)),
+        },
+      });
+      this.logger.warn(`Provisioning ${id} deferred: PENDING_COMMERCIAL_BRIDGE_KEY`);
+      return { id, status: "PENDING" };
+    }
 
     try {
       const response = await fetch(`${origin}${path}`, {
@@ -147,6 +161,7 @@ export class ProvisioningService {
         headers: {
           "content-type": "application/json",
           "idempotency-key": item.idempotencyKey,
+          "x-central-commercial-bridge-key": bridgeKey,
         },
         body: JSON.stringify(item.payload),
         signal: AbortSignal.timeout(20_000),

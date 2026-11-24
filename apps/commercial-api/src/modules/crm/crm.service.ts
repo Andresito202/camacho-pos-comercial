@@ -245,6 +245,74 @@ export class CrmService {
     return this.serializeTrialPublic(current);
   }
 
+  /**
+   * Asks Central to issue a real 120h TRIAL license and callback activate-from-central.
+   * Does not simulate activation locally.
+   */
+  async requestCentralTrialIssue(trialId: string) {
+    const origin = this.config.centralOrigin();
+    const bridgeKey = this.config.env.COMMERCIAL_BRIDGE_KEY?.trim() ?? "";
+    if (!origin) {
+      throw new ServiceUnavailableException({ code: "PENDING_CENTRAL_CREDENTIALS" });
+    }
+    if (!bridgeKey || bridgeKey.length < 32) {
+      throw new ServiceUnavailableException({ code: "PENDING_COMMERCIAL_BRIDGE_KEY" });
+    }
+    const trial = await this.prisma.trialEnrollment.findFirst({
+      where: { id: trialId, deletedAt: null },
+    });
+    if (!trial) throw new NotFoundException({ code: "TRIAL_NOT_FOUND" });
+    if (trial.status !== "PENDING_ACTIVATION") {
+      throw new ConflictException({
+        code: "TRIAL_NOT_PENDING",
+        message: `Estado ${trial.status} no solicita emisión Central.`,
+      });
+    }
+
+    const callbackOrigin =
+      process.env.COMMERCIAL_API_PUBLIC_ORIGIN?.replace(/\/$/, "") ||
+      `http://127.0.0.1:${this.config.env.PORT}`;
+
+    const response = await fetch(`${origin}/v1/commercial/trial/issue`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-central-commercial-bridge-key": bridgeKey,
+      },
+      body: JSON.stringify({
+        trialId: trial.id,
+        email: trial.email,
+        companyName: trial.companyName ?? undefined,
+        trialHours: 120,
+        commercialApiOrigin: callbackOrigin,
+        jti: `issue-${trial.id}-${Date.now()}`,
+      }),
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      throw new ServiceUnavailableException({
+        code: "CENTRAL_TRIAL_ISSUE_FAILED",
+        message: text.slice(0, 500),
+      });
+    }
+    const body = (await response.json()) as {
+      centralLicenseRef?: string;
+      commercialActivation?: string;
+      expiresAt?: string;
+      startsAt?: string;
+    };
+    // Re-read after Central callback (activate-from-central) may have flipped status.
+    const refreshed = await this.prisma.trialEnrollment.findFirst({
+      where: { id: trial.id, deletedAt: null },
+    });
+    return {
+      central: body,
+      trial: refreshed ? this.serializeTrialPublic(refreshed, { includePii: false }) : null,
+      callbackOriginUsed: callbackOrigin,
+    };
+  }
+
   async assertCentralWebhookKey(webhookKey: string | undefined): Promise<void> {
     const expected = this.config.env.CENTRAL_TRIAL_WEBHOOK_KEY?.trim();
     if (!expected || expected.length < 32) {
