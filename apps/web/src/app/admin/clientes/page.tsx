@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { Table } from "@camacho-pos/ui";
 import {
+  AdminActionForm,
   AdminEmptyState,
   AdminFilterForm,
   AdminSection,
@@ -58,7 +59,7 @@ export default async function AdminClientesPage({ searchParams }: Props) {
       <div>
         <h1 className="font-serif text-3xl">Clientes y solicitudes</h1>
         <p className="mt-2 text-[var(--muted)]">
-          ContactRequest, Lead, DemoRequest y CommercialCustomer con filtros reales.
+          ContactRequest, Lead, DemoRequest y CommercialCustomer con filtros y cambio de estado real.
         </p>
       </div>
 
@@ -94,6 +95,30 @@ export default async function AdminClientesPage({ searchParams }: Props) {
             empty="Sin solicitudes de contacto."
           />
         </div>
+        {data.contacts.length > 0 ? (
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            {data.contacts.slice(0, 8).map((row) => (
+              <AdminActionForm
+                key={row.id}
+                title={`Contacto · ${row.fullName}`}
+                path={`/v1/admin/clientes/contacts/${row.id}`}
+                method="PATCH"
+                token={token}
+                submitLabel="Actualizar estado"
+                fields={[
+                  {
+                    name: "status",
+                    label: "Estado",
+                    type: "select",
+                    defaultValue: row.status,
+                    options: STATUS_OPTIONS,
+                    required: true,
+                  },
+                ]}
+              />
+            ))}
+          </div>
+        ) : null}
       </AdminSection>
 
       <AdminSection title="Leads">
@@ -110,6 +135,64 @@ export default async function AdminClientesPage({ searchParams }: Props) {
             empty="Sin leads."
           />
         </div>
+        {data.leads.length > 0 ? (
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            {data.leads.slice(0, 8).map((row) => (
+              <div key={row.id} className="space-y-3">
+                <AdminActionForm
+                  title={`Lead · ${row.fullName}`}
+                  path={`/v1/admin/clientes/leads/${row.id}`}
+                  method="PATCH"
+                  token={token}
+                  submitLabel="Actualizar estado"
+                  fields={[
+                    {
+                      name: "status",
+                      label: "Estado",
+                      type: "select",
+                      defaultValue: row.status,
+                      options: STATUS_OPTIONS,
+                      required: true,
+                    },
+                    {
+                      name: "notes",
+                      label: "Notas (opcional)",
+                      type: "textarea",
+                    },
+                  ]}
+                />
+                <AdminActionForm
+                  title="Registrar actividad"
+                  path={`/v1/admin/clientes/leads/${row.id}/activities`}
+                  method="POST"
+                  token={token}
+                  submitLabel="Guardar nota"
+                  fields={[
+                    {
+                      name: "type",
+                      label: "Tipo",
+                      type: "select",
+                      defaultValue: "NOTE",
+                      options: [
+                        { value: "NOTE", label: "NOTE" },
+                        { value: "CALL", label: "CALL" },
+                        { value: "EMAIL", label: "EMAIL" },
+                        { value: "WHATSAPP", label: "WHATSAPP" },
+                        { value: "DEMO", label: "DEMO" },
+                      ],
+                    },
+                    {
+                      name: "body",
+                      label: "Detalle",
+                      type: "textarea",
+                      required: true,
+                    },
+                  ]}
+                />
+              </div>
+            ))}
+          </div>
+        ) : null}
       </AdminSection>
 
       <AdminSection title="Demos">
@@ -126,6 +209,30 @@ export default async function AdminClientesPage({ searchParams }: Props) {
             empty="Sin demos."
           />
         </div>
+        {data.demos.length > 0 ? (
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            {data.demos.slice(0, 8).map((row) => (
+              <AdminActionForm
+                key={row.id}
+                title={`Demo · ${row.fullName}`}
+                path={`/v1/admin/clientes/demos/${row.id}`}
+                method="PATCH"
+                token={token}
+                submitLabel="Actualizar estado"
+                fields={[
+                  {
+                    name: "status",
+                    label: "Estado",
+                    type: "select",
+                    defaultValue: row.status,
+                    options: STATUS_OPTIONS,
+                    required: true,
+                  },
+                ]}
+              />
+            ))}
+          </div>
+        ) : null}
       </AdminSection>
 
       <AdminSection title="Clientes">

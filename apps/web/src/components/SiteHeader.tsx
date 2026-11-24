@@ -81,9 +81,10 @@ export function SiteHeader({
 
           <button
             type="button"
-            className="inline-flex items-center justify-center rounded-md px-3 py-2 text-sm font-medium lg:hidden"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md px-3 py-2.5 text-sm font-medium text-[var(--navy)] lg:hidden"
             aria-expanded={open}
             aria-controls="mobile-nav"
+            aria-label={open ? "Cerrar menú" : "Abrir menú"}
             onClick={() => setOpen((value) => !value)}
           >
             {open ? "Cerrar" : "Menú"}

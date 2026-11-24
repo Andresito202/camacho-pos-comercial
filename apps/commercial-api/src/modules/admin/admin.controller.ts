@@ -4,6 +4,7 @@ import {
   Controller,
   Delete,
   Get,
+  NotFoundException,
   Param,
   Patch,
   Post,
@@ -227,12 +228,58 @@ const SocialSchema = z
   })
   .strict();
 
+const LeadStatusSchema = z.enum([
+  "NEW",
+  "CONTACTED",
+  "QUALIFIED",
+  "DEMO_SCHEDULED",
+  "WON",
+  "LOST",
+  "ARCHIVED",
+]);
+
+const CrmStatusPatchSchema = z
+  .object({
+    status: LeadStatusSchema,
+    notes: z.string().max(4000).optional(),
+  })
+  .strict();
+
+const LeadActivityCreateSchema = z
+  .object({
+    body: z.string().min(1).max(4000),
+    type: z.enum(["NOTE", "CALL", "EMAIL", "WHATSAPP", "DEMO"]).optional().default("NOTE"),
+  })
+  .strict();
+
+const FaqCreateSchema = z
+  .object({
+    slug: z.string().min(1).max(120),
+    question: z.string().min(1),
+    answer: z.string().min(1),
+    category: z.string().nullable().optional(),
+    sortOrder: z.number().int().optional(),
+    publicationStatus: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]).optional(),
+  })
+  .strict();
+
 const FaqPatchSchema = z
   .object({
     question: z.string().min(1).optional(),
     answer: z.string().min(1).optional(),
     category: z.string().nullable().optional(),
     sortOrder: z.number().int().optional(),
+    publicationStatus: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]).optional(),
+  })
+  .strict();
+
+const BlogCreateSchema = z
+  .object({
+    slug: z.string().min(1).max(120),
+    title: z.string().min(1),
+    body: z.string().min(1),
+    excerpt: z.string().nullable().optional(),
+    coverImageUrl: z.string().nullable().optional(),
     publicationStatus: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]).optional(),
   })
   .strict();
@@ -614,6 +661,125 @@ export class AdminController {
     return { contacts, leads, demos, customers };
   }
 
+  @Patch("clientes/leads/:id")
+  async patchLeadStatus(
+    @Param("id") id: string,
+    @Body() body: unknown,
+    @Req() req: { commercialSession?: BridgedSession },
+  ) {
+    const input = CrmStatusPatchSchema.parse(body);
+    const existing = await this.prisma.lead.findFirst({ where: { id, deletedAt: null } });
+    if (!existing) throw new NotFoundException({ code: "LEAD_NOT_FOUND" });
+    const updated = await this.prisma.lead.update({
+      where: { id },
+      data: {
+        status: input.status,
+        ...(input.notes != null ? { notes: input.notes } : {}),
+      },
+    });
+    if (existing.status !== input.status) {
+      await this.prisma.leadActivity.create({
+        data: {
+          leadId: id,
+          type: "STATUS_CHANGE",
+          body: `Estado ${existing.status} → ${input.status}`,
+          actorType: "ADMIN",
+          actorId: this.actor(req),
+        },
+      });
+    }
+    await this.audit.record({
+      actorType: "ADMIN",
+      actorId: this.actor(req),
+      action: "LEAD_STATUS_UPDATED",
+      entityType: "Lead",
+      entityId: id,
+      metadata: { from: existing.status, to: input.status },
+    });
+    return updated;
+  }
+
+  @Post("clientes/leads/:id/activities")
+  async createLeadActivity(
+    @Param("id") id: string,
+    @Body() body: unknown,
+    @Req() req: { commercialSession?: BridgedSession },
+  ) {
+    const input = LeadActivityCreateSchema.parse(body);
+    const existing = await this.prisma.lead.findFirst({ where: { id, deletedAt: null } });
+    if (!existing) throw new NotFoundException({ code: "LEAD_NOT_FOUND" });
+    const activity = await this.prisma.leadActivity.create({
+      data: {
+        leadId: id,
+        type: input.type,
+        body: input.body,
+        actorType: "ADMIN",
+        actorId: this.actor(req),
+      },
+    });
+    await this.audit.record({
+      actorType: "ADMIN",
+      actorId: this.actor(req),
+      action: "LEAD_ACTIVITY_CREATED",
+      entityType: "LeadActivity",
+      entityId: activity.id,
+      metadata: { leadId: id, type: input.type },
+    });
+    return activity;
+  }
+
+  @Patch("clientes/contacts/:id")
+  async patchContactStatus(
+    @Param("id") id: string,
+    @Body() body: unknown,
+    @Req() req: { commercialSession?: BridgedSession },
+  ) {
+    const input = CrmStatusPatchSchema.parse(body);
+    const existing = await this.prisma.contactRequest.findFirst({
+      where: { id, deletedAt: null },
+    });
+    if (!existing) throw new NotFoundException({ code: "CONTACT_NOT_FOUND" });
+    const updated = await this.prisma.contactRequest.update({
+      where: { id },
+      data: { status: input.status },
+    });
+    await this.audit.record({
+      actorType: "ADMIN",
+      actorId: this.actor(req),
+      action: "CONTACT_STATUS_UPDATED",
+      entityType: "ContactRequest",
+      entityId: id,
+      metadata: { from: existing.status, to: input.status },
+    });
+    return updated;
+  }
+
+  @Patch("clientes/demos/:id")
+  async patchDemoStatus(
+    @Param("id") id: string,
+    @Body() body: unknown,
+    @Req() req: { commercialSession?: BridgedSession },
+  ) {
+    const input = CrmStatusPatchSchema.parse(body);
+    const existing = await this.prisma.demoRequest.findFirst({
+      where: { id, deletedAt: null },
+    });
+    if (!existing) throw new NotFoundException({ code: "DEMO_NOT_FOUND" });
+    const updated = await this.prisma.demoRequest.update({
+      where: { id },
+      data: { status: input.status },
+    });
+    await this.audit.record({
+      actorType: "ADMIN",
+      actorId: this.actor(req),
+      action: "DEMO_STATUS_UPDATED",
+      entityType: "DemoRequest",
+      entityId: id,
+      metadata: { from: existing.status, to: input.status },
+    });
+    return updated;
+  }
+
   // ─── Promociones / cupones ────────────────────────────────────────────────
 
   @Get("promociones")
@@ -744,6 +910,24 @@ export class AdminController {
     return { faqs, blog, legal, seo, social };
   }
 
+  @Post("contenidos/faqs")
+  async createFaq(
+    @Body() body: unknown,
+    @Req() req: { commercialSession?: BridgedSession },
+  ) {
+    const input = FaqCreateSchema.parse(body);
+    const created = await this.content.createFaq(input);
+    await this.audit.record({
+      actorType: "ADMIN",
+      actorId: this.actor(req),
+      action: "FAQ_CREATED",
+      entityType: "Faq",
+      entityId: created.id,
+      metadata: { slug: input.slug },
+    });
+    return created;
+  }
+
   @Patch("contenidos/faqs/:id")
   async patchFaq(
     @Param("id") id: string,
@@ -760,6 +944,24 @@ export class AdminController {
       entityId: id,
     });
     return updated;
+  }
+
+  @Post("contenidos/blog")
+  async createBlog(
+    @Body() body: unknown,
+    @Req() req: { commercialSession?: BridgedSession },
+  ) {
+    const input = BlogCreateSchema.parse(body);
+    const created = await this.content.createBlog(input);
+    await this.audit.record({
+      actorType: "ADMIN",
+      actorId: this.actor(req),
+      action: "BLOG_CREATED",
+      entityType: "BlogPost",
+      entityId: created.id,
+      metadata: { slug: input.slug },
+    });
+    return created;
   }
 
   @Patch("contenidos/blog/:id")

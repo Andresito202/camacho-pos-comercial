@@ -184,4 +184,82 @@ describe("admin test fixture (non-production only)", () => {
         : body.code;
     expect(code).toBe("COUPON_EXPIRED");
   });
+
+  it("CRM lead status patch + activity write to Postgres", async () => {
+    const server = app.getHttpAdapter().getInstance();
+    const lead = await prisma.lead.create({
+      data: {
+        email: `ci-admin-lead-${Date.now()}@example.com`,
+        fullName: "CI Admin Lead",
+        status: "NEW",
+        source: "admin-fixture",
+      },
+    });
+
+    const patch = await server.inject({
+      method: "PATCH",
+      url: `/v1/admin/clientes/leads/${lead.id}`,
+      headers: { ...FIXTURE_HEADERS, "content-type": "application/json" },
+      payload: { status: "CONTACTED", notes: "Llamada inicial CI" },
+    });
+    expect(patch.statusCode).toBe(200);
+    const patched = patch.json() as { status: string; notes: string | null };
+    expect(patched.status).toBe("CONTACTED");
+
+    const activity = await server.inject({
+      method: "POST",
+      url: `/v1/admin/clientes/leads/${lead.id}/activities`,
+      headers: { ...FIXTURE_HEADERS, "content-type": "application/json" },
+      payload: { type: "NOTE", body: "Seguimiento CI" },
+    });
+    // Nest returns 201 by default for POST; some adapters may surface 200 with the entity.
+    expect([200, 201]).toContain(activity.statusCode);
+
+    const row = await prisma.lead.findUniqueOrThrow({ where: { id: lead.id } });
+    expect(row.status).toBe("CONTACTED");
+    const activities = await prisma.leadActivity.findMany({ where: { leadId: lead.id } });
+    expect(activities.some((a) => a.type === "STATUS_CHANGE")).toBe(true);
+    expect(activities.some((a) => a.body === "Seguimiento CI")).toBe(true);
+
+    await prisma.leadActivity.deleteMany({ where: { leadId: lead.id } });
+    await prisma.lead.delete({ where: { id: lead.id } });
+  });
+
+  it("creates FAQ and blog drafts via admin content endpoints", async () => {
+    const server = app.getHttpAdapter().getInstance();
+    const slugSuffix = Date.now();
+
+    const faq = await server.inject({
+      method: "POST",
+      url: "/v1/admin/contenidos/faqs",
+      headers: { ...FIXTURE_HEADERS, "content-type": "application/json" },
+      payload: {
+        slug: `ci-faq-${slugSuffix}`,
+        question: "¿Cómo se contrata el plan?",
+        answer: "Desde el catálogo comercial con solicitud de contratación.",
+        publicationStatus: "DRAFT",
+      },
+    });
+    expect([200, 201]).toContain(faq.statusCode);
+    const faqBody = faq.json() as { id: string; slug: string };
+    expect(faqBody.slug).toBe(`ci-faq-${slugSuffix}`);
+
+    const blog = await server.inject({
+      method: "POST",
+      url: "/v1/admin/contenidos/blog",
+      headers: { ...FIXTURE_HEADERS, "content-type": "application/json" },
+      payload: {
+        slug: `ci-blog-${slugSuffix}`,
+        title: "CI Blog Draft",
+        body: "Contenido de prueba del panel comercial.",
+        publicationStatus: "DRAFT",
+      },
+    });
+    expect([200, 201]).toContain(blog.statusCode);
+    const blogBody = blog.json() as { id: string; title: string };
+    expect(blogBody.title).toBe("CI Blog Draft");
+
+    await prisma.faq.delete({ where: { id: faqBody.id } });
+    await prisma.blogPost.delete({ where: { id: blogBody.id } });
+  });
 });

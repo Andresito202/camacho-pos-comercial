@@ -1,8 +1,22 @@
-# Phase 3 delivery — Block D (SEO, Lighthouse, evidencia visual)
+# Phase 3 delivery — consolidación A–D
 
 Rama: `feat/commercial-platform-foundation`  
 Fecha evidencia (UTC): 2026-11-24  
 Estados permitidos (sin % arbitrarios): **IMPLEMENTADO** | **PROBADO** | **PARCIAL** | **BLOQUEADO** | **PENDIENTE**
+
+## Superadministrador comercial (prioridad)
+
+| Módulo | Estado | Evidencia |
+|---|---|---|
+| Planes / precios | **PROBADO** | Admin PATCH plan + plan-prices; fixture test restore amount |
+| Productos / imágenes / inventario | **PROBADO** | CRUD productos + image URL + variante + stock en `/admin/equipos` |
+| Kits | **PARCIAL** | Edición de kits existentes; sin compositor de kit-create |
+| CRM clientes | **PROBADO** | List/filter + PATCH status contact/lead/demo + lead activities → Postgres |
+| Promociones / cupones | **PROBADO** | CRUD + ventana America/Bogota; coupon expired gate |
+| WhatsApp / banners / SEO / social | **PROBADO** | `/admin/contenidos` → PATCH ajustes + social + SEO upsert |
+| FAQ / Blog create | **PROBADO** | POST create + PATCH edit; tests admin-fixture |
+| Pedidos / pagos | **PARCIAL** | Listas + filtro estado; sin refund/fulfillment actions |
+| Login Central GLOBAL | **BLOQUEADO** | Fixture no-prod o bridge; sin sesión GLOBAL live en este entorno |
 
 ## Módulos Block D
 

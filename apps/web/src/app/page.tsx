@@ -85,7 +85,7 @@ export default async function HomePage() {
             <h1 className="max-w-xl font-serif text-4xl leading-[1.08] sm:text-5xl lg:text-[3.35rem]">
               El POS que vende contigo, en el mostrador
             </h1>
-            <p className="mt-5 max-w-xl text-lg text-white/75">
+            <p className="mt-5 max-w-xl text-lg text-white/90">
               Software y equipos para tiendas, supermercados, droguerías, avícolas, salsamentarias, panaderías y
               pastelerías. Contrata en línea; tu caja opera en Windows o Android.
             </p>
@@ -154,7 +154,7 @@ export default async function HomePage() {
             <Link
               key={sector.slug}
               href={`/soluciones/${sector.slug}`}
-              className="rounded-md border border-[var(--border)] bg-white/80 px-3 py-1.5 text-sm font-medium text-[var(--navy)] transition hover:border-[var(--teal)] hover:text-[var(--teal)]"
+              className="inline-flex min-h-11 items-center rounded-md border border-[var(--border)] bg-white/80 px-3 py-2 text-sm font-medium text-[var(--navy)] transition hover:border-[var(--teal)] hover:text-[var(--teal)]"
             >
               {sector.name}
             </Link>

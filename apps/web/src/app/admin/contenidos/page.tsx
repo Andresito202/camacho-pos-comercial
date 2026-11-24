@@ -184,8 +184,31 @@ export default async function AdminContenidosPage() {
       </AdminSection>
 
       <AdminSection title="FAQ">
+        <AdminActionForm
+          title="Crear FAQ"
+          path="/v1/admin/contenidos/faqs"
+          method="POST"
+          token={token}
+          submitLabel="Crear FAQ"
+          fields={[
+            { name: "slug", label: "Slug", required: true },
+            { name: "question", label: "Pregunta", required: true },
+            { name: "answer", label: "Respuesta", type: "textarea", required: true },
+            { name: "category", label: "Categoría" },
+            {
+              name: "publicationStatus",
+              label: "Estado",
+              type: "select",
+              defaultValue: "DRAFT",
+              options: [
+                { value: "DRAFT", label: "DRAFT" },
+                { value: "PUBLISHED", label: "PUBLISHED" },
+              ],
+            },
+          ]}
+        />
         {faqs.length === 0 ? (
-          <AdminEmptyState title="Sin FAQ" detail="Publica o edita FAQ cuando existan en seed/DB." />
+          <AdminEmptyState title="Sin FAQ" detail="Crea la primera FAQ con el formulario anterior." />
         ) : (
           <div className="grid gap-4 lg:grid-cols-2">
             {faqs.map((faq) => (
@@ -216,8 +239,32 @@ export default async function AdminContenidosPage() {
       </AdminSection>
 
       <AdminSection title="Blog">
+        <AdminActionForm
+          title="Crear artículo"
+          path="/v1/admin/contenidos/blog"
+          method="POST"
+          token={token}
+          submitLabel="Crear post"
+          fields={[
+            { name: "slug", label: "Slug", required: true },
+            { name: "title", label: "Título", required: true },
+            { name: "excerpt", label: "Excerpt" },
+            { name: "body", label: "Cuerpo", type: "textarea", required: true },
+            { name: "coverImageUrl", label: "URL portada (opcional)" },
+            {
+              name: "publicationStatus",
+              label: "Estado",
+              type: "select",
+              defaultValue: "DRAFT",
+              options: [
+                { value: "DRAFT", label: "DRAFT" },
+                { value: "PUBLISHED", label: "PUBLISHED" },
+              ],
+            },
+          ]}
+        />
         {blog.length === 0 ? (
-          <AdminEmptyState title="Sin posts" />
+          <AdminEmptyState title="Sin posts" detail="Crea el primero con el formulario anterior." />
         ) : (
           <div className="grid gap-4 lg:grid-cols-2">
             {blog.map((post) => (

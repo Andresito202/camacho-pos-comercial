@@ -148,6 +148,26 @@ export class ContentService {
     });
   }
 
+  async createFaq(input: {
+    slug: string;
+    question: string;
+    answer: string;
+    category?: string | null;
+    sortOrder?: number;
+    publicationStatus?: "DRAFT" | "PUBLISHED" | "ARCHIVED";
+  }) {
+    return this.prisma.faq.create({
+      data: {
+        slug: input.slug,
+        question: input.question,
+        answer: input.answer,
+        category: input.category ?? null,
+        sortOrder: input.sortOrder ?? 0,
+        publicationStatus: input.publicationStatus ?? "DRAFT",
+      },
+    });
+  }
+
   async updateFaq(
     id: string,
     input: {
@@ -170,6 +190,28 @@ export class ContentService {
         ...(input.publicationStatus != null
           ? { publicationStatus: input.publicationStatus }
           : {}),
+      },
+    });
+  }
+
+  async createBlog(input: {
+    slug: string;
+    title: string;
+    body: string;
+    excerpt?: string | null;
+    coverImageUrl?: string | null;
+    publicationStatus?: "DRAFT" | "PUBLISHED" | "ARCHIVED";
+  }) {
+    const status = input.publicationStatus ?? "DRAFT";
+    return this.prisma.blogPost.create({
+      data: {
+        slug: input.slug,
+        title: input.title,
+        body: input.body,
+        excerpt: input.excerpt ?? null,
+        coverImageUrl: input.coverImageUrl ?? null,
+        publicationStatus: status,
+        publishedAt: status === "PUBLISHED" ? new Date() : null,
       },
     });
   }
