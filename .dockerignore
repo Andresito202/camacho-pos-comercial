@@ -1,0 +1,26 @@
+# Keep local credentials and build caches out of Docker build contexts.
+.git
+**/.git
+.env
+**/.env
+.env.*
+**/.env.*
+**/.next
+**/node_modules
+**/dist
+**/build
+**/coverage
+**/.turbo
+**/.cache
+**/test-results
+**/playwright-report
+**/blob-report
+**/*.log
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/*.jks
+**/*.keystore
+**/id_rsa
+**/id_ed25519
