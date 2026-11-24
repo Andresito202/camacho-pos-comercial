@@ -71,6 +71,7 @@ services:
       context: .
       dockerfile: infrastructure/docker/Dockerfile.web
       args:
+        # Browser-facing origin (host machine / public URL). Not used for in-compose SSR.
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://127.0.0.1:4000}
         NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://127.0.0.1:3000}
         NEXT_PUBLIC_CENTRAL_AUTHORITY_ORIGIN: ${NEXT_PUBLIC_CENTRAL_AUTHORITY_ORIGIN:-}
@@ -83,6 +84,10 @@ services:
       NODE_ENV: production
       PORT: "3000"
       HOSTNAME: 0.0.0.0
+      # Server-side fetch target inside the Compose network (SSR / Route Handlers).
+      COMMERCIAL_API_INTERNAL_URL: ${COMMERCIAL_API_INTERNAL_URL:-http://commercial-api:4000}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://127.0.0.1:4000}
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://127.0.0.1:3000}
     ports:
       - "3000:3000"
     healthcheck:

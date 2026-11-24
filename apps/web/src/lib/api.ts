@@ -258,13 +258,8 @@ function pickPrice(
     (p) => p.billingInterval === interval && p.publicationStatus === "PUBLISHED",
   );
   if (publishedInterval) return publishedInterval;
-  if (interval === "MONTHLY") {
-    const anyPublished = prices.find((p) => p.publicationStatus === "PUBLISHED");
-    if (anyPublished) return anyPublished;
-  }
-  const draftInterval = prices.find((p) => p.billingInterval === interval);
-  if (draftInterval) return draftInterval;
-  return prices[0];
+  // Never fall back to another billing interval — missing interval means undefined.
+  return prices.find((p) => p.billingInterval === interval);
 }
 
 function mapPlan(plan: ApiPlan): Plan {
@@ -615,10 +610,11 @@ export async function buildWhatsAppMessage(input: {
 }
 
 export async function submitDemoRequest(payload: Record<string, string>): Promise<{ ok: boolean; id?: string }> {
+  const rawPhone = (payload.phone ?? payload.phoneE164 ?? "").trim();
   const body = {
     fullName: payload.name ?? payload.fullName,
     email: payload.email,
-    phoneE164: payload.phone ?? payload.phoneE164,
+    ...(rawPhone ? { phoneE164: rawPhone } : {}),
     sector: payload.sector,
     notes: [payload.business, payload.city, payload.goals, payload.notes].filter(Boolean).join(" | "),
   };
@@ -633,10 +629,11 @@ export async function submitDemoRequest(payload: Record<string, string>): Promis
 }
 
 export async function submitContact(payload: Record<string, string>): Promise<{ ok: boolean; id?: string }> {
+  const rawPhone = (payload.phone ?? payload.phoneE164 ?? "").trim();
   const body = {
     fullName: payload.name ?? payload.fullName,
     email: payload.email,
-    phoneE164: payload.phone ?? payload.phoneE164,
+    ...(rawPhone ? { phoneE164: rawPhone } : {}),
     companyName: payload.companyName,
     message: payload.message ?? payload.subject,
     sourcePath: "/contacto",

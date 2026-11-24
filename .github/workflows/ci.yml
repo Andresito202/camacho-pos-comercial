@@ -72,6 +72,10 @@ jobs:
       - name: Prisma migrate deploy
         run: pnpm prisma:migrate:deploy
 
+      # Workspace packages export types from dist/; build them before typecheck.
+      - name: Build contracts, configuration, database
+        run: pnpm --filter @camacho-pos-comercial/contracts --filter @camacho-pos-comercial/configuration --filter @camacho-pos-comercial/database run build
+
       - name: Typecheck
         run: pnpm typecheck
 
@@ -81,8 +85,8 @@ jobs:
       - name: Test
         run: pnpm test
 
-      - name: Build API packages
-        run: pnpm build
+      - name: Build API
+        run: pnpm --filter @camacho-pos-comercial/commercial-api run build
 
       - name: Build web
         run: pnpm build:web

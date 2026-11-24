@@ -1,4 +1,13 @@
+/**
+ * Browser uses NEXT_PUBLIC_API_URL (host-reachable).
+ * Server/SSR prefers COMMERCIAL_API_INTERNAL_URL (e.g. http://commercial-api:4000 in Compose)
+ * so containers do not call 127.0.0.1 inside their own network namespace.
+ */
 export function getApiUrl(): string {
+  if (typeof window === "undefined") {
+    const internal = process.env.COMMERCIAL_API_INTERNAL_URL?.replace(/\/$/, "");
+    if (internal) return internal;
+  }
   return process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "http://127.0.0.1:4000";
 }
 
