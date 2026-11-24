@@ -24,3 +24,8 @@ apps/web/playwright-report
 apps/web/blob-report
 apps/web/playwright/.cache
 infrastructure/docker/.env
+
+# Environment variants and generated Next.js cache
+.env.*
+!.env.example
+.next/
