@@ -40,7 +40,7 @@ Phase 3 delivery labels (Block D): see `docs/commercial/phase3-delivery.md` (`IM
 | 27 | REDES SOCIALES Y CONTACTO | Implementación parcial | Contacto/WhatsApp presentes; `SocialLink` seed no PUBLISHED → API social `[]`. |
 | 28 | NOTIFICACIONES | Implementación parcial | Outbox + worker **stub** (marca SENT sin proveedor real). |
 | 29 | SEGURIDAD | Implementación parcial | Fail-closed admin, anti-tamper, webhook key, Zod; scan local Phase 3 en `docs/security/public-repo-scan-phase3.md` (sin secretos live). HTTPS prod / CSRF completo / secret scanning CI remoto **no** acreditados. |
-| 30 | RENDIMIENTO Y ACCESIBILIDAD | Implementación parcial | Lighthouse 13.6.0 real en `/` y `/planes` desktop+mobile — ver `docs/testing/lighthouse-phase3.md` (perf 100; home a11y 92; SEO 100). CWV de campo / Search Console **PENDIENTE**. |
+| 30 | RENDIMIENTO Y ACCESIBILIDAD | Implementación parcial | Lighthouse 13.6.0 real en `/` y `/planes` desktop+mobile — ver `docs/testing/lighthouse-phase3.md` (home perf 100 / a11y 92 / SEO 100; planes desktop perf 96 / SEO 100). CWV de campo / Search Console **PENDIENTE**. |
 | 31 | DESPLIEGUE E INFRAESTRUCTURA | Implementado sin evidencia | `docker-compose.yml` + nginx/runbooks presentes; Docker **no instalado** aquí; compose no ejecutado en esta sesión. |
 | 32 | PRUEBAS OBLIGATORIAS | Implementación parcial | Vitest contratos+API y smoke manual observados históricamente; E2E Playwright es esqueleto; lista mandatoria de la misión incompleta. |
 | 33 | VALIDACIÓN VISUAL | Implementado y probado | Capturas históricas multi-viewport + Phase 3 prod en `docs/testing/screenshots-phase3/` (inicio, planes monthly, equipos, modal, admin × 1920/390). |
