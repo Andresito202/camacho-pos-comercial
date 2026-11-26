@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { createHash } from "node:crypto";
-import type { PrismaClient } from "@camacho-pos-comercial/database";
+import type { Prisma, PrismaClient } from "@camacho-pos-comercial/database";
 import { PRISMA } from "../../common/prisma.tokens.js";
 import { AppConfigService } from "../../config/config.service.js";
 import { AuditService } from "../audit/audit.service.js";
@@ -26,8 +26,8 @@ export class ProvisioningService {
     @Inject(AuditService) private readonly audit: AuditService,
   ) {}
 
-  async enqueueForPaidOrder(orderId: string) {
-    const order = await this.prisma.order.findUniqueOrThrow({
+  async enqueueForPaidOrder(orderId: string, tx: Prisma.TransactionClient) {
+    const order = await tx.order.findUniqueOrThrow({
       where: { id: orderId },
       include: {
         items: true,
@@ -37,7 +37,7 @@ export class ProvisioningService {
     });
 
     const idempotencyKey = createHash("sha256").update(`provision:${orderId}`).digest("hex");
-    const existing = await this.prisma.provisioningRequest.findUnique({
+    const existing = await tx.provisioningRequest.findUnique({
       where: { idempotencyKey },
     });
     if (existing) return existing;
@@ -70,7 +70,7 @@ export class ProvisioningService {
     };
 
     const origin = this.config.centralOrigin();
-    const request = await this.prisma.provisioningRequest.create({
+    const request = await tx.provisioningRequest.create({
       data: {
         orderId,
         // PENDING when Central missing → order stays PAID (PAID + PENDING_PROVISION).
@@ -84,7 +84,7 @@ export class ProvisioningService {
     });
 
     if (origin) {
-      await this.prisma.order.update({
+      await tx.order.update({
         where: { id: orderId },
         data: { status: "PROVISIONING" },
       });
@@ -102,7 +102,7 @@ export class ProvisioningService {
         orderStatus: origin ? "PROVISIONING" : "PAID",
         provisioningStatus: request.status,
       },
-    });
+    }, tx);
 
     return request;
   }
@@ -166,6 +166,7 @@ export class ProvisioningService {
     try {
       const response = await fetch(`${origin}${path}`, {
         method: "POST",
+        redirect: "error",
         headers: {
           "content-type": "application/json",
           "idempotency-key": item.idempotencyKey,
