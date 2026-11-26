@@ -204,8 +204,8 @@ async function seedPlans() {
       description:
         "Ideal para tiendas y panaderías que arrancan. Una licencia = una caja. Precio de referencia pendiente de publicación comercial.",
       sortOrder: 1,
-      monthly: 49900,
-      annual: 499000,
+      monthly: 29900,
+      annual: 299000,
     },
     {
       slug: "profesional",
@@ -214,8 +214,8 @@ async function seedPlans() {
       description:
         "Incluye sincronización al recuperar conexión y facturación electrónica cuando el servicio esté contratado y disponible. Precio de referencia pendiente de publicación.",
       sortOrder: 2,
-      monthly: 79900,
-      annual: 799000,
+      monthly: 49900,
+      annual: 499000,
     },
     {
       slug: "empresarial",
@@ -224,8 +224,8 @@ async function seedPlans() {
       description:
         "Pensado para redes en crecimiento. Reportes y multi-sucursal según disponibilidad publicada. Precio de referencia pendiente de publicación.",
       sortOrder: 3,
-      monthly: 119900,
-      annual: 1199000,
+      monthly: 89900,
+      annual: 899000,
     },
     {
       slug: "perpetua",
@@ -256,7 +256,6 @@ async function seedPlans() {
         name: p.name,
         tagline: p.tagline,
         description: p.description,
-        publicationStatus: PublicationStatus.DRAFT,
       },
     });
 
@@ -279,7 +278,7 @@ async function seedPlans() {
         maxCajas: 1,
         publicationStatus: PublicationStatus.DRAFT,
       },
-      update: { name: `${p.name} — 1 caja`, publicationStatus: PublicationStatus.DRAFT },
+      update: { name: `${p.name} — 1 caja` },
     });
   }
 
@@ -333,26 +332,10 @@ async function seedPlans() {
 
 async function upsertPlanPrice(planId: string, interval: BillingInterval, amountCents: number) {
   const existing = await prisma.planPrice.findFirst({
-    where: { planId, billingInterval: interval, version: 1 },
+    where: { planId, billingInterval: interval },
+    select: { id: true },
   });
-  if (existing) {
-    await prisma.planPrice.update({
-      where: { id: existing.id },
-      data: {
-        amountCents,
-        publicationStatus: PublicationStatus.DRAFT,
-      },
-    });
-    await prisma.planPriceHistory.create({
-      data: {
-        planPriceId: existing.id,
-        amountCents,
-        reason: "seed-refresh",
-        changedBy: "seed",
-      },
-    });
-    return;
-  }
+  if (existing) return;
   const price = await prisma.planPrice.create({
     data: {
       planId,
