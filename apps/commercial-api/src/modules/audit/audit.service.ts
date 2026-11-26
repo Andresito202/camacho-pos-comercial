@@ -14,8 +14,8 @@ export class AuditService {
     entityId?: string | null;
     metadata?: Prisma.InputJsonValue;
     ipHash?: string | null;
-  }): Promise<void> {
-    await this.prisma.auditLog.create({
+  }, writer: Pick<PrismaClient, "auditLog"> = this.prisma): Promise<void> {
+    await writer.auditLog.create({
       data: {
         actorType: input.actorType,
         actorId: input.actorId ?? null,
