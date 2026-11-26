@@ -9,7 +9,8 @@ import { buildMetadata, breadcrumbJsonLd, JsonLd } from "@/lib/seo";
 
 export const metadata = buildMetadata({
   title: "Software POS",
-  description: "Camacho POS Colombia: caja local-first, inventario, reportes y preparación fiscal con estados transparentes.",
+  description:
+    "Camacho POS Colombia: vende aunque se interrumpa internet, controla inventario, reportes y preparación fiscal con estados transparentes.",
   path: "/software-pos",
 });
 
@@ -22,9 +23,9 @@ export default async function SoftwarePosPage() {
         <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-2">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--yellow)]">Software</p>
-            <h1 className="mt-3 font-serif text-4xl sm:text-5xl">POS local-first para el mostrador colombiano</h1>
+            <h1 className="mt-3 font-serif text-4xl sm:text-5xl">POS para el mostrador colombiano</h1>
             <p className="mt-5 text-lg text-white/75">
-              Electron en Windows y app Android para cajeros. Este sitio web no sustituye la caja: comercializa, contrata y orienta la instalación.
+              Aplicación en Windows y app Android para cajeros. Este sitio web no sustituye la caja: comercializa, contrata y orienta la instalación.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link href="/planes"><Button size="lg">Ver planes</Button></Link>

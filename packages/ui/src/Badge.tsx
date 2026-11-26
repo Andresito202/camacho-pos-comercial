@@ -7,7 +7,8 @@ const tones: Record<BadgeTone, string> = {
   navy: "bg-[var(--navy)] text-[var(--ivory)]",
   yellow: "bg-[var(--yellow)] text-[var(--navy)]",
   teal: "bg-[var(--teal)] text-white",
-  muted: "bg-[color-mix(in_srgb,var(--muted)_18%,white)] text-[var(--muted)]",
+  /* Opaque light chip + navy text so muted badges stay ≥4.5:1 on navy sections. */
+  muted: "bg-[color-mix(in_srgb,var(--ivory)_92%,white)] text-[var(--navy)]",
   steel: "bg-[var(--steel)] text-white",
   danger: "bg-[color-mix(in_srgb,var(--danger)_12%,white)] text-[var(--danger)]",
 };

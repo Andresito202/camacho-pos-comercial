@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getSiteUrl } from "./env";
+import { getSiteUrl, isStaging } from "./env";
 
 export function buildMetadata({
   title,
@@ -15,12 +15,17 @@ export function buildMetadata({
   const site = getSiteUrl();
   const url = `${site}${path}`;
   const fullTitle = path === "/" ? title : `${title} | Camacho POS Colombia`;
+  const blockIndexing = noIndex || isStaging();
+  const ogImage = `${site}/brand/logo-yellow.png`;
 
   return {
+    metadataBase: new URL(site),
     title: fullTitle,
     description,
     alternates: { canonical: url },
-    robots: noIndex ? { index: false, follow: false } : { index: true, follow: true },
+    robots: blockIndexing
+      ? { index: false, follow: false, nocache: true }
+      : { index: true, follow: true },
     openGraph: {
       title: fullTitle,
       description,
@@ -28,12 +33,13 @@ export function buildMetadata({
       siteName: "Camacho POS Colombia",
       locale: "es_CO",
       type: "website",
-      images: [{ url: `${site}/brand/logo-yellow.png` }],
+      images: [{ url: ogImage, alt: "Camacho POS Colombia" }],
     },
     twitter: {
       card: "summary_large_image",
       title: fullTitle,
       description,
+      images: [ogImage],
     },
   };
 }
@@ -116,10 +122,12 @@ export function productJsonLd(input: {
 }
 
 export function faqJsonLd(items: Array<{ question: string; answer: string }>) {
+  const usable = items.filter((item) => item.question.trim() && item.answer.trim());
+  if (usable.length === 0) return null;
   return {
     "@context": "https://schema.org",
     "@type": "FAQPage",
-    mainEntity: items.map((item) => ({
+    mainEntity: usable.map((item) => ({
       "@type": "Question",
       name: item.question,
       acceptedAnswer: {
@@ -130,7 +138,13 @@ export function faqJsonLd(items: Array<{ question: string; answer: string }>) {
   };
 }
 
-export function JsonLd({ data }: { data: Record<string, unknown> | Array<Record<string, unknown>> }) {
+export function JsonLd({
+  data,
+}: {
+  data: Record<string, unknown> | Array<Record<string, unknown>> | null | undefined;
+}) {
+  if (!data) return null;
+  if (Array.isArray(data) && data.length === 0) return null;
   return (
     <script
       type="application/ld+json"

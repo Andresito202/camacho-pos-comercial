@@ -42,6 +42,16 @@ enum LeadStatus {
   ARCHIVED
 }
 
+enum TrialStatus {
+  /// Form received; clock has NOT started. Waiting for Central license confirmation.
+  PENDING_ACTIVATION
+  ACTIVE
+  EXPIRED
+  CONVERTED
+  CANCELLED
+  BLOCKED
+}
+
 enum LeadActivityType {
   NOTE
   CALL
@@ -208,6 +218,7 @@ model CommercialCustomer {
   contactRequests  ContactRequest[]
   leads            Lead[]
   demoRequests     DemoRequest[]
+  trialEnrollments TrialEnrollment[]
   carts            Cart[]
   orders           Order[]
   payments         Payment[]
@@ -266,18 +277,31 @@ model ContactRequest {
 }
 
 model Lead {
-  id          String     @id @default(cuid())
-  customerId  String?
-  email       String
-  fullName    String
-  phoneE164   String?
-  companyName String?
-  source      String?
-  status      LeadStatus @default(NEW)
-  notes       String?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  deletedAt   DateTime?
+  id                    String     @id @default(cuid())
+  customerId            String?
+  email                 String
+  fullName              String
+  phoneE164             String?
+  companyName           String?
+  businessType          String?
+  source                String?
+  status                LeadStatus @default(NEW)
+  notes                 String?
+  /// Catalog plan id when the lead originates from /planes hire flow
+  planId                String?
+  /// MONTHLY | ANNUAL | PERPETUAL
+  modality              String?
+  /// SOFTWARE | COMPLETE
+  solutionType          String?
+  departmentCode        String?
+  cityCode              String?
+  cajaQty               Int?
+  branchQty             Int?
+  consentDataTreatment  Boolean    @default(false)
+  consentCommercial     Boolean    @default(false)
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+  deletedAt             DateTime?
 
   customer   CommercialCustomer? @relation(fields: [customerId], references: [id])
   activities LeadActivity[]
@@ -285,6 +309,7 @@ model Lead {
 
   @@index([email])
   @@index([status])
+  @@index([planId])
   @@index([deletedAt])
 }
 
@@ -322,6 +347,65 @@ model DemoRequest {
 
   @@index([email])
   @@index([status])
+}
+
+/// Commercial 5-day trial enrollment (CRM). Clock starts only after Central confirms POS license.
+model TrialEnrollment {
+  id                   String      @id @default(cuid())
+  leadId               String?
+  customerId           String?
+  fullName             String
+  email                String
+  phoneE164            String?
+  companyName          String?
+  sector               String?
+  city                 String?
+  notes                String?
+  status               TrialStatus @default(PENDING_ACTIVATION)
+  /// Null until Central confirms activation — form submit must NOT start the clock.
+  startsAt             DateTime?
+  expiresAt            DateTime?
+  blockedAt            DateTime?
+  blockedReason        String?
+  /// SHA-256 of one-time access token required to read status (anti-enumeration).
+  accessTokenHash      String
+  /// Stable identity key (sha256 email|phone) for anti-repeat / abuse checks.
+  identityKey          String
+  centralLicenseRef    String?
+  activatedAt          DateTime?
+  /// Only CENTRAL_LICENSE_CONFIRMED is accepted — never local simulation.
+  activationSource     String?
+  consentDataTreatment Boolean     @default(false)
+  consentTerms         Boolean     @default(false)
+  sourcePath           String?
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+  deletedAt            DateTime?
+
+  customer CommercialCustomer? @relation(fields: [customerId], references: [id])
+
+  @@unique([accessTokenHash])
+  @@index([email])
+  @@index([identityKey])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+/// Durable shared rate-limit counters (Postgres). Prefer over process-local maps in multi-instance.
+model RateLimitCounter {
+  key     String   @id
+  count   Int      @default(0)
+  resetAt DateTime
+}
+
+/// Captcha token replay protection (Turnstile/reCAPTCHA response hashes).
+model CaptchaTokenUse {
+  tokenHash String   @id
+  provider  String
+  usedAt    DateTime @default(now())
+  expiresAt DateTime
+
+  @@index([expiresAt])
 }
 
 // ─── Catalog ─────────────────────────────────────────────────────────────────
@@ -869,20 +953,23 @@ model CustomerBenefit {
 // ─── Support / Content ───────────────────────────────────────────────────────
 
 model SupportTicket {
-  id         String                @id @default(cuid())
-  customerId String?
-  email      String
-  subject    String
-  status     SupportTicketStatus   @default(OPEN)
-  priority   SupportTicketPriority @default(NORMAL)
-  createdAt  DateTime              @default(now())
-  updatedAt  DateTime              @updatedAt
-  closedAt   DateTime?
-  deletedAt  DateTime?
+  id              String                @id @default(cuid())
+  customerId      String?
+  email           String
+  subject         String
+  status          SupportTicketStatus   @default(OPEN)
+  priority        SupportTicketPriority @default(NORMAL)
+  /// SHA-256 of one-time access token required for public GET (anti-IDOR).
+  accessTokenHash String
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  closedAt        DateTime?
+  deletedAt       DateTime?
 
   customer CommercialCustomer? @relation(fields: [customerId], references: [id])
   messages SupportMessage[]
 
+  @@unique([accessTokenHash])
   @@index([status])
   @@index([email])
 }
@@ -1031,6 +1118,9 @@ model SiteSettings {
   whatsappNumber     String // must be clearly marked DEV placeholder when provisional
   supportEmail       String
   logoUrl            String?
+  promoBannerMessage String?
+  promoBannerHref    String?
+  promoBannerCta     String?
   publicationStatus  PublicationStatus @default(DRAFT)
   updatedAt          DateTime @updatedAt
   createdAt          DateTime @default(now())

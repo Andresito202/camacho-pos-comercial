@@ -43,7 +43,7 @@ export function CartClient() {
                   type="number"
                   min={1}
                   value={item.quantity}
-                  onChange={(event) => update(item.id, Number(event.target.value) || 1)}
+                  onChange={(event) => update(item.id, Number((event.target as HTMLInputElement).value) || 1)}
                   className="ml-2 w-16 rounded border border-[var(--border)] px-2 py-1"
                 />
               </label>

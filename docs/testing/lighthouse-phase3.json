@@ -1,0 +1,50 @@
+{
+  "home-desktop": {
+    "url": "http://127.0.0.1:3000/",
+    "formFactor": "desktop",
+    "fetchTime": "2026-11-24T04:15:26.038Z",
+    "lighthouseVersion": "13.6.0",
+    "scores": {
+      "performance": 100,
+      "accessibility": 92,
+      "best-practices": 96,
+      "seo": 100
+    }
+  },
+  "home-mobile": {
+    "url": "http://127.0.0.1:3000/",
+    "formFactor": "mobile",
+    "fetchTime": "2026-11-24T04:15:39.019Z",
+    "lighthouseVersion": "13.6.0",
+    "scores": {
+      "performance": 100,
+      "accessibility": 92,
+      "best-practices": 96,
+      "seo": 100
+    }
+  },
+  "planes-desktop": {
+    "url": "http://127.0.0.1:3000/planes",
+    "formFactor": "desktop",
+    "fetchTime": "2026-11-24T04:15:51.822Z",
+    "lighthouseVersion": "13.6.0",
+    "scores": {
+      "performance": 96,
+      "accessibility": 100,
+      "best-practices": 96,
+      "seo": 100
+    }
+  },
+  "planes-mobile": {
+    "url": "http://127.0.0.1:3000/planes",
+    "formFactor": "mobile",
+    "fetchTime": "2026-11-24T04:16:03.574Z",
+    "lighthouseVersion": "13.6.0",
+    "scores": {
+      "performance": 100,
+      "accessibility": 100,
+      "best-practices": 96,
+      "seo": 100
+    }
+  }
+}

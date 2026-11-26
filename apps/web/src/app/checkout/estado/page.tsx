@@ -40,8 +40,8 @@ export default async function CheckoutStatusPage({ searchParams }: Props) {
           <p className="text-sm text-[var(--muted)]">Fuente: {result.source}</p>
           {result.data.status === "pagado" ? (
             <p className="text-[var(--steel)]">
-              Siguiente paso: revisa <Link href="/descargas" className="underline">Descargas</Link> para instalar Electron
-              (Windows) o Android. Los cajeros no operan en esta web.
+              Siguiente paso: revisa <Link href="/descargas" className="underline">Descargas</Link> para instalar la app en
+              Windows o Android. Los cajeros no operan en esta web.
             </p>
           ) : (
             <p className="text-[var(--steel)]">

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AdminTestBanner } from "@/components/admin/AdminTestBanner";
 import { requireGlobalAdmin } from "@/lib/auth";
 import { buildMetadata } from "@/lib/seo";
 
@@ -11,14 +12,15 @@ export const metadata = buildMetadata({
 
 const NAV = [
   { href: "/admin", label: "Dashboard" },
-  { href: "/admin/planes", label: "Planes" },
-  { href: "/admin/equipos", label: "Equipos" },
+  { href: "/admin/planes", label: "Planes / precios" },
+  { href: "/admin/equipos", label: "Productos / inventario" },
   { href: "/admin/pedidos", label: "Pedidos" },
   { href: "/admin/pagos", label: "Pagos" },
-  { href: "/admin/clientes", label: "Clientes" },
-  { href: "/admin/contenidos", label: "Contenidos" },
-  { href: "/admin/promociones", label: "Promociones" },
-  { href: "/admin/ajustes", label: "Ajustes" },
+  { href: "/admin/clientes", label: "Clientes / solicitudes" },
+  { href: "/admin/contenidos", label: "Contenidos / SEO" },
+  { href: "/admin/promociones", label: "Promociones / cupones" },
+  { href: "/admin/tickets", label: "Tickets" },
+  { href: "/admin/ajustes", label: "WhatsApp / banners" },
 ];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -49,7 +51,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           ))}
         </nav>
       </aside>
-      <div>{children}</div>
+      <div>
+        <AdminTestBanner />
+        {children}
+      </div>
     </div>
   );
 }

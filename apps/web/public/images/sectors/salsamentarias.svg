@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" role="img" aria-label="Composición sector salsamentarias">
+  <rect width="800" height="500" fill="#F6F5F0"/>
+  <path d="M0 370c140-35 240 15 360-8s240-28 440 18v120H0Z" fill="#168177" opacity=".2"/>
+  <rect x="70" y="130" width="300" height="200" rx="18" fill="#101C2D"/>
+  <rect x="95" y="155" width="250" height="90" rx="10" fill="#F6F5F0"/>
+  <rect x="95" y="260" width="110" height="45" rx="8" fill="#F7C83C"/>
+  <rect x="220" y="260" width="125" height="45" rx="8" fill="#25425A"/>
+  <rect x="420" y="140" width="280" height="220" rx="18" fill="#25425A"/>
+  <circle cx="560" cy="250" r="52" fill="#F7C83C"/>
+  <rect x="500" y="320" width="120" height="18" rx="6" fill="#F6F5F0" opacity=".85"/>
+  <text x="70" y="75" fill="#101C2D" font-family="Georgia, serif" font-size="28">Salsamentaria</text>
+  <text x="70" y="460" fill="#526070" font-family="Arial, sans-serif" font-size="16">Ilustración referencial — no es fotografía de producto</text>
+</svg>

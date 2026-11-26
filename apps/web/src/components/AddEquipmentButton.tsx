@@ -10,12 +10,15 @@ export function AddEquipmentButton({ item }: { item: Equipment }) {
       size="sm"
       onClick={() =>
         addCartItem({
-          id: `eq-${item.id}`,
+          id: `eq-${item.productVariantId ?? item.kitId ?? item.id}`,
           kind: "equipment",
-          refId: item.id,
+          refId: item.productVariantId ?? item.kitId ?? item.id,
           slug: item.slug,
           name: item.name,
           unitPrice: item.price,
+          ...(item.productVariantId ? { productVariantId: item.productVariantId } : {}),
+          ...(item.kitId ? { kitId: item.kitId } : {}),
+          ...(item.priceVersion != null ? { priceVersion: item.priceVersion } : {}),
         })
       }
     >

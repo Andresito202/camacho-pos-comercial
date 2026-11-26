@@ -4,7 +4,15 @@ import { useState } from "react";
 import { Button } from "@camacho-pos/ui";
 import { buildWhatsAppMessage } from "@/lib/api";
 
-export function WhatsAppHire({ planId, city }: { planId: string; city?: string }) {
+export function WhatsAppHire({
+  planId,
+  planSlug,
+  city,
+}: {
+  planId: string;
+  planSlug?: string;
+  city?: string;
+}) {
   const [pending, setPending] = useState(false);
 
   return (
@@ -17,7 +25,8 @@ export function WhatsAppHire({ planId, city }: { planId: string; city?: string }
           const result = await buildWhatsAppMessage({
             intent: "contratar",
             planId,
-            city,
+            ...(planSlug ? { planSlug } : {}),
+            ...(city ? { city } : {}),
           });
           window.open(result.url, "_blank", "noopener,noreferrer");
         } finally {
