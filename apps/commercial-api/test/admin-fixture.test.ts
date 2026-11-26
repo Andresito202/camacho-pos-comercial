@@ -109,9 +109,18 @@ describe("admin test fixture (non-production only)", () => {
     const patchedBody = patch.json() as { amountCents: number; id: string };
     expect(patchedBody.amountCents).toBe(patchedAmount);
 
-    const restore = await server.inject({
+    expect(patchedBody.id).not.toBe(planPriceId);
+    const stale = await server.inject({
       method: "PATCH",
       url: `/v1/admin/catalog/plan-prices/${planPriceId}`,
+      headers: { ...FIXTURE_HEADERS, "content-type": "application/json" },
+      payload: { amountCents: originalAmountCents, publish: false },
+    });
+    expect(stale.statusCode).toBe(400);
+
+    const restore = await server.inject({
+      method: "PATCH",
+      url: `/v1/admin/catalog/plan-prices/${patchedBody.id}`,
       headers: { ...FIXTURE_HEADERS, "content-type": "application/json" },
       payload: { amountCents: originalAmountCents, publish: false },
     });
@@ -120,7 +129,7 @@ describe("admin test fixture (non-production only)", () => {
     expect(restoredBody.amountCents).toBe(originalAmountCents);
 
     const row = await prisma.planPrice.findUniqueOrThrow({ where: { id: planPriceId } });
-    expect(row.amountCents).toBe(originalAmountCents);
+    expect(row).toMatchObject({ amountCents: originalAmountCents, publicationStatus: "ARCHIVED" });
   });
 
   it("promo / coupon outside America/Bogota window is not applied", async () => {
