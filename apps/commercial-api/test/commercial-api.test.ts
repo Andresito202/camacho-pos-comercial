@@ -281,20 +281,27 @@ describe("commercial-api critical paths", () => {
       },
     };
 
-    // Prefer Authorization Bearer (not query ?key= — Referer/log leak).
-    const first = await inject("POST", "/v1/webhooks/factus-pay/collections", {
+    const refused = await inject("POST", "/v1/webhooks/factus-pay/collections", {
       payload,
       headers: { authorization: `Bearer ${key}` },
     });
-    expect([200, 201]).toContain(first.statusCode);
-    expect(first.json().result).toBe("STORED");
+    expect(refused.statusCode).toBe(400);
+    expect(errorCode(refused.json())).toBe("FACTUS_PAY_SOURCE_MISMATCH");
+    expect(await prisma.provisioningRequest.count({ where: { orderId: order.id } })).toBe(0);
 
-    const second = await inject("POST", "/v1/webhooks/factus-pay/collections", {
-      payload,
-      headers: { "x-factus-pay-webhook-key": key },
-    });
-    expect([200, 201]).toContain(second.statusCode);
-    expect(second.json().result).toBe("DUPLICATE");
+    await prisma.payment.update({ where: { referenceCode }, data: { provider: "FACTUS_PAY" } });
+    const responses = await Promise.all([
+      inject("POST", "/v1/webhooks/factus-pay/collections", {
+        payload,
+        headers: { authorization: `Bearer ${key}` },
+      }),
+      inject("POST", "/v1/webhooks/factus-pay/collections", {
+        payload,
+        headers: { "x-factus-pay-webhook-key": key },
+      }),
+    ]);
+    expect(responses.map((response) => response.statusCode).every((code) => [200, 201].includes(code))).toBe(true);
+    expect(responses.map((response) => response.json().result).sort()).toEqual(["DUPLICATE", "STORED"]);
 
     const payment = await prisma.payment.findUniqueOrThrow({ where: { referenceCode } });
     expect(payment.status).toBe("PAID");
@@ -305,6 +312,18 @@ describe("commercial-api critical paths", () => {
     const provision = await prisma.provisioningRequest.findFirst({ where: { orderId: order.id } });
     expect(provision?.status).toBe("PENDING");
     expect(provision?.lastError).toBe("PENDING_CENTRAL_CREDENTIALS");
+    expect(await prisma.paymentAttempt.count({ where: { paymentId: payment.id, status: "SUCCEEDED" } })).toBe(1);
+    expect(await prisma.provisioningRequest.count({ where: { orderId: order.id } })).toBe(1);
+
+    // Reproduce a historical PAID order where the portal stopped before creating the outbox row.
+    await prisma.provisioningRequest.deleteMany({ where: { orderId: order.id } });
+    const replay = await inject("POST", "/v1/webhooks/factus-pay/collections", {
+      payload,
+      headers: { authorization: `Bearer ${key}` },
+    });
+    expect(replay.json().result).toBe("DUPLICATE");
+    expect(await prisma.provisioningRequest.count({ where: { orderId: order.id } })).toBe(1);
+
   });
 
   it("sandbox simulate paid does not call Central provision", async () => {
