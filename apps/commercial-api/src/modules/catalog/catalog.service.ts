@@ -156,28 +156,42 @@ export class CatalogService {
     adminId: string;
     publish?: boolean;
   }) {
-    const price = await this.prisma.planPrice.findUnique({ where: { id: input.planPriceId } });
-    if (!price) throw new NotFoundException({ code: "PLAN_PRICE_NOT_FOUND" });
-
     return this.prisma.$transaction(async (tx) => {
-      const updated = await tx.planPrice.update({
-        where: { id: input.planPriceId },
+      const reference = await tx.planPrice.findUnique({ where: { id: input.planPriceId } });
+      if (!reference) throw new NotFoundException({ code: "PLAN_PRICE_NOT_FOUND" });
+
+      const plan = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT "id" FROM "Plan" WHERE "id" = ${reference.planId} AND "deletedAt" IS NULL FOR UPDATE
+      `;
+      if (!plan.length) throw new NotFoundException({ code: "PLAN_NOT_FOUND" });
+
+      const price = await tx.planPrice.findUnique({ where: { id: input.planPriceId } });
+      if (!price || price.publicationStatus === "ARCHIVED") {
+        throw new BadRequestException({ code: "PLAN_PRICE_VERSION_INACTIVE" });
+      }
+      const scope = { planId: price.planId, billingInterval: price.billingInterval };
+      const recent = await tx.planPrice.aggregate({ where: scope, _max: { version: true } });
+      const now = new Date();
+      await tx.planPrice.updateMany({
+        where: { ...scope, publicationStatus: { in: input.publish ? ["DRAFT", "PUBLISHED"] : ["DRAFT"] } },
+        data: { publicationStatus: "ARCHIVED", effectiveTo: now },
+      });
+      return tx.planPrice.create({
         data: {
+          ...scope,
+          version: (recent._max.version ?? 0) + 1,
           amountCents: input.amountCents,
-          version: price.version + 1,
+          currencyCode: price.currencyCode,
           publicationStatus: input.publish ? "PUBLISHED" : "DRAFT",
+          effectiveFrom: now,
           createdByAdminId: input.adminId,
+          history: { create: {
+            amountCents: input.amountCents,
+            changedBy: input.adminId,
+            reason: input.publish ? "admin-price-published" : "admin-price-proposed",
+          } },
         },
       });
-      await tx.planPriceHistory.create({
-        data: {
-          planPriceId: updated.id,
-          amountCents: input.amountCents,
-          changedBy: input.adminId,
-          reason: "admin-price-update",
-        },
-      });
-      return updated;
     });
   }
 
