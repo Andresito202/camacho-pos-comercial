@@ -166,20 +166,24 @@ export default async function HomePage() {
           {[
             {
               title: "La fila no se detiene",
-              body: "Si se cae Internet, la caja del local sigue cobrando. Recuperás el ritmo del mostrador sin improvisar cuadernos.",
+              body: "Con la sesión y la licencia vigentes, la caja puede registrar ventas en efectivo durante un corte. Los movimientos pendientes se envían al recuperar la conexión.",
             },
             {
               title: "Control por rol, no por caos",
               body: "Dueño, supervisor y cajero con destinos distintos. El superadmin comercial no opera como cajero.",
             },
             {
-              title: "Promesas con estado real",
-              body: "Disponible, En certificación o Próximamente. Comprás lo publicado; no un catálogo decorativo.",
+              title: "Verificación de pagos desde Caja",
+              body: "La consulta al proveedor se realiza desde la pantalla de Caja cuando la integración está habilitada. La aprobación manual de una transferencia queda identificada como una acción del supervisor.",
+              certification: true,
             },
           ].map((item) => (
             <article key={item.title} className="surface-card border-l-4 border-[var(--teal)] p-5 pl-4">
               <h3 className="text-xl font-bold">{item.title}</h3>
               <p className="mt-2 text-[var(--muted)]">{item.body}</p>
+              {item.certification && (
+                <div className="mt-3"><StatusBadge status="en_certificacion" /></div>
+              )}
             </article>
           ))}
         </div>
