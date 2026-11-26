@@ -1,9 +1,23 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { createHash } from "node:crypto";
+import { z } from "zod";
 import type { Prisma, PrismaClient } from "@camacho-pos-comercial/database";
 import { PRISMA } from "../../common/prisma.tokens.js";
 import { AppConfigService } from "../../config/config.service.js";
 import { AuditService } from "../audit/audit.service.js";
+
+const retryableStatuses = ["PENDING", "QUEUED", "FAILED"] as const;
+
+// Central CommercialProvisioningResponseSchema wire contract.
+const centralResponse = z.object({
+  status: z.enum(["ACCEPTED", "DUPLICATE"]),
+  provisioningId: z.string().min(8),
+  idempotencyKey: z.string().min(8),
+  licenseUnits: z.number().int().positive(),
+  cajaRule: z.literal("ONE_LICENSE_ONE_CAJA"),
+  fulfillment: z.enum(["QUEUED", "ISSUED", "ALREADY_QUEUED", "ALREADY_ISSUED"]),
+  licenseIds: z.array(z.string().uuid()).max(10_000),
+}).strict();
 
 /**
  * ProvisioningRequest outbox → Central license issuance.
@@ -114,7 +128,8 @@ export class ProvisioningService {
   async processDue(limit = 20) {
     const due = await this.prisma.provisioningRequest.findMany({
       where: {
-        status: { in: ["PENDING", "QUEUED", "FAILED"] },
+        status: { in: [...retryableStatuses] },
+        order: { status: { in: ["PAID", "PROVISIONING"] } },
         OR: [{ nextRetryAt: null }, { nextRetryAt: { lte: new Date() } }],
       },
       take: limit,
@@ -130,39 +145,29 @@ export class ProvisioningService {
 
   private async attemptSend(id: string) {
     const item = await this.prisma.provisioningRequest.findUniqueOrThrow({ where: { id } });
-    const origin = this.config.centralOrigin();
-
-    if (!origin) {
-      // Stay PENDING — order remains PAID. Documented retry stub: bump nextRetryAt only.
-      await this.prisma.provisioningRequest.update({
-        where: { id },
-        data: {
-          status: "PENDING",
-          lastError: "PENDING_CENTRAL_CREDENTIALS",
-          attemptCount: item.attemptCount + 1,
-          nextRetryAt: new Date(Date.now() + 60_000 * Math.min(60, item.attemptCount + 1)),
+    const persist = async (data: Prisma.ProvisioningRequestUpdateManyMutationInput) => {
+      const result = await this.prisma.provisioningRequest.updateMany({
+        where: {
+          id,
+          attemptCount: item.attemptCount,
+          status: { in: [...retryableStatuses] },
+          order: { status: { in: ["PAID", "PROVISIONING"] } },
         },
+        data: { ...data, attemptCount: { increment: 1 } },
       });
-      this.logger.warn(`Provisioning ${id} deferred: PENDING_CENTRAL_CREDENTIALS (order stays PAID)`);
-      return { id, status: "PENDING" };
+      return result.count === 1;
+    };
+    const nextRetryAt = new Date(Date.now() + 60_000 * Math.min(60, item.attemptCount + 1));
+    const origin = this.config.centralOrigin();
+    const bridgeKey = this.config.env.COMMERCIAL_BRIDGE_KEY?.trim() ?? "";
+    if (!origin || bridgeKey.length < 32) {
+      const lastError = origin ? "PENDING_COMMERCIAL_BRIDGE_KEY" : "PENDING_CENTRAL_CREDENTIALS";
+      const saved = await persist({ status: "PENDING", lastError, nextRetryAt });
+      if (saved) this.logger.warn(`Provisioning ${id} deferred: ${lastError}`);
+      return { id, status: saved ? "PENDING" : "UNCHANGED" };
     }
 
     const path = this.config.env.CENTRAL_PROVISIONING_PATH || "/v1/commercial/provisioning";
-    const bridgeKey = this.config.env.COMMERCIAL_BRIDGE_KEY?.trim() ?? "";
-    if (!bridgeKey || bridgeKey.length < 32) {
-      await this.prisma.provisioningRequest.update({
-        where: { id },
-        data: {
-          status: "PENDING",
-          lastError: "PENDING_COMMERCIAL_BRIDGE_KEY",
-          attemptCount: item.attemptCount + 1,
-          nextRetryAt: new Date(Date.now() + 60_000 * Math.min(60, item.attemptCount + 1)),
-        },
-      });
-      this.logger.warn(`Provisioning ${id} deferred: PENDING_COMMERCIAL_BRIDGE_KEY`);
-      return { id, status: "PENDING" };
-    }
-
     try {
       const response = await fetch(`${origin}${path}`, {
         method: "POST",
@@ -178,62 +183,41 @@ export class ProvisioningService {
       if (!response.ok) {
         throw new Error(`CENTRAL_HTTP_${response.status}`);
       }
-      const body = (await response.json()) as {
-        status?: string;
-        fulfillment?: string;
-        provisioningId?: string;
-        licenseIds?: string[];
-      };
-      if (body.status !== "ACCEPTED" && body.status !== "DUPLICATE") {
-        throw new Error(`CENTRAL_PROVISIONING_STATUS_${body.status ?? "UNKNOWN"}`);
+      const parsed = centralResponse.safeParse(await response.json());
+      if (!parsed.success) throw new Error("CENTRAL_PROVISIONING_RESPONSE_INVALID");
+      const body = parsed.data;
+      const payload = item.payload as Record<string, unknown>;
+      if (body.idempotencyKey !== item.idempotencyKey || body.licenseUnits !== payload.licenseUnits) {
+        throw new Error("CENTRAL_PROVISIONING_ORDER_MISMATCH");
       }
-      const issued =
-        body.fulfillment === "ISSUED" || body.fulfillment === "ALREADY_ISSUED";
-      const licenseIds = Array.isArray(body.licenseIds) ? body.licenseIds : [];
-      // Queue ack alone must not mark the commercial order FULFILLED — need real licenseIds.
-      if (issued && licenseIds.length === 0) {
-        throw new Error("CENTRAL_ISSUED_WITHOUT_LICENSE_IDS");
+      const issued = body.fulfillment === "ISSUED" || body.fulfillment === "ALREADY_ISSUED";
+      const uniqueLicenseIds = new Set(body.licenseIds.map((id) => id.toLowerCase()));
+      if (issued ? uniqueLicenseIds.size !== body.licenseUnits || body.licenseIds.length !== body.licenseUnits
+        : body.licenseIds.length !== 0) {
+        throw new Error("CENTRAL_PROVISIONING_LICENSE_COUNT_MISMATCH");
       }
-      await this.prisma.provisioningRequest.update({
-        where: { id },
-        data: {
-          status: issued ? "SENT" : "QUEUED",
-          attemptCount: item.attemptCount + 1,
-          lastError: issued
-            ? null
-            : `CENTRAL_FULFILLMENT_${body.fulfillment ?? "QUEUED"}`,
-          acknowledgedAt: new Date(),
-          ...(issued
-            ? {
-                payload: {
-                  ...(item.payload as Record<string, unknown>),
-                  centralLicenseIds: licenseIds,
-                  centralProvisioningId: body.provisioningId,
-                },
-              }
-            : {}),
-        },
+
+      // Central's issuance response attests license creation only. Order completion
+      // needs a separate activation acknowledgment from the licensing authority.
+      const saved = await persist({
+        status: issued ? "SENT" : "QUEUED",
+        lastError: issued ? null : `CENTRAL_FULFILLMENT_${body.fulfillment}`,
+        nextRetryAt: issued ? null : nextRetryAt,
+        acknowledgedAt: new Date(),
+        ...(issued ? {
+          payload: {
+            ...(item.payload as Prisma.InputJsonObject),
+            centralLicenseIds: body.licenseIds,
+            centralProvisioningId: body.provisioningId,
+          },
+        } : {}),
       });
-      if (issued) {
-        await this.prisma.order.update({
-          where: { id: item.orderId },
-          data: { status: "FULFILLED" },
-        });
-      }
-      return { id, status: issued ? "SENT" : "QUEUED", fulfillment: body.fulfillment, licenseIds };
+      if (!saved) return { id, status: "UNCHANGED" };
+      return { id, status: issued ? "SENT" : "QUEUED", fulfillment: body.fulfillment, licenseIds: body.licenseIds };
     } catch (error) {
       const message = error instanceof Error ? error.message : "UNKNOWN";
-      await this.prisma.provisioningRequest.update({
-        where: { id },
-        data: {
-          status: "FAILED",
-          lastError: message,
-          attemptCount: item.attemptCount + 1,
-          nextRetryAt: new Date(Date.now() + 60_000 * Math.min(60, item.attemptCount + 1)),
-        },
-      });
-      // Order may already be PROVISIONING; leave it — do not silently mark FULFILLED.
-      return { id, status: "FAILED" };
+      const saved = await persist({ status: "FAILED", lastError: message, nextRetryAt });
+      return { id, status: saved ? "FAILED" : "UNCHANGED" };
     }
   }
 }
