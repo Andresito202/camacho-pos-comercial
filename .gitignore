@@ -29,3 +29,13 @@ infrastructure/docker/.env
 .env.*
 !.env.example
 .next/
+
+# Local deployment output and private key containers
+apps/web/out/
+.vercel/
+.cache/
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
