@@ -102,10 +102,14 @@ export default async function AdminPlanesPage() {
           </div>
 
           <div className="mt-4 grid gap-4 md:grid-cols-2">
-            {(plan.prices ?? []).map((price) => (
+            {(plan.prices ?? []).map((price) => price.publicationStatus === "ARCHIVED" ? (
+              <p key={price.id} className="text-sm text-[var(--muted)]">
+                {price.billingInterval} v{price.version} · {formatMoney({ amountCents: price.amountCents, currency: "COP" })} · Archivado
+              </p>
+            ) : (
               <AdminActionForm
                 key={price.id}
-                title={`Precio ${price.billingInterval} v${price.version} (${formatMoney({ amountCents: price.amountCents, currency: "COP" })})`}
+                title={`Precio ${price.billingInterval} v${price.version} · ${price.publicationStatus} (${formatMoney({ amountCents: price.amountCents, currency: "COP" })})`}
                 path={`/v1/admin/catalog/plan-prices/${price.id}`}
                 method="PATCH"
                 token={token}

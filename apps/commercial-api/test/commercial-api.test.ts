@@ -1,4 +1,5 @@
 import "reflect-metadata";
+import { randomUUID } from "node:crypto";
 import { beforeAll, afterAll, describe, expect, it } from "vitest";
 
 process.env.NODE_ENV = "test";
@@ -158,6 +159,28 @@ describe("commercial-api critical paths", () => {
     if (typeof record.message === "string") return record.message;
     return JSON.stringify(body);
   }
+
+  it("versions an editable price proposal while preserving the published price and its historical amount", async () => {
+    const { CatalogService } = await import("../src/modules/catalog/catalog.service.js");
+    const catalog = app.get(CatalogService);
+    const plan = await prisma.plan.create({
+      data: { slug: `ci-price-${randomUUID()}`, name: "CI price versioning", description: "Fixture", publicationStatus: "PUBLISHED" },
+    });
+    const initial = await prisma.planPrice.create({
+      data: { planId: plan.id, version: 1, billingInterval: "MONTHLY", amountCents: 49900, publicationStatus: "PUBLISHED" },
+    });
+
+    const draft = await catalog.updatePlanPriceAmount({ planPriceId: initial.id, amountCents: 29900, adminId: "ci-admin" });
+    expect(draft).toMatchObject({ version: 2, publicationStatus: "DRAFT", amountCents: 29900 });
+    expect(await catalog.getPurchasablePlanPrice(initial.id)).toMatchObject({ version: 1, amountCents: 49900 });
+    await expect(catalog.getPurchasablePlanPrice(draft.id)).rejects.toBeDefined();
+
+    const published = await catalog.updatePlanPriceAmount({ planPriceId: draft.id, amountCents: 29900, adminId: "ci-admin", publish: true });
+    expect(published).toMatchObject({ version: 3, publicationStatus: "PUBLISHED", amountCents: 29900 });
+    expect(await prisma.planPrice.findUniqueOrThrow({ where: { id: initial.id } }))
+      .toMatchObject({ version: 1, amountCents: 49900, publicationStatus: "ARCHIVED" });
+    expect(await prisma.planPriceHistory.count({ where: { planPriceId: { in: [draft.id, published.id] } } })).toBe(2);
+  });
 
   it("rejects expired coupons", async () => {
     const res = await inject("GET", "/v1/promotions/coupons/EXPIRED10/validate");
