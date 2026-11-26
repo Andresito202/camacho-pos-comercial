@@ -23,15 +23,15 @@ export default function DescargasPage() {
         <article className="border border-[var(--border)] bg-white/70 p-5">
           <h2 className="font-serif text-2xl">Windows — aplicación de caja</h2>
           <p className="mt-2 text-sm text-[var(--steel)]">
-            Tras contratar, el canal comercial entrega el instalador firmado de la aplicación de caja para Windows y la
-            guía de puesta en marcha. Requiere un equipo Windows del kit contratado.
+            La entrega del instalador firmado y de la guía de puesta en marcha depende de la publicación de la versión
+            certificada para el equipo. Consulta su disponibilidad con soporte.
           </p>
           <p className="mt-3 text-xs text-[var(--muted)]">El instalador no se publica en abierto sin licencia activa.</p>
         </article>
         <article className="border border-[var(--border)] bg-white/70 p-5">
           <h2 className="font-serif text-2xl">Android — caja móvil / mostrador</h2>
           <p className="mt-2 text-sm text-[var(--steel)]">
-            La app Android del kit se entrega por el canal comercial. No uses instaladores de terceros.
+            Consulta con soporte la disponibilidad de la versión firmada para tu terminal Android.
           </p>
         </article>
         <article className="border border-[var(--yellow)] bg-[color-mix(in_srgb,var(--yellow)_14%,white)] p-5">
