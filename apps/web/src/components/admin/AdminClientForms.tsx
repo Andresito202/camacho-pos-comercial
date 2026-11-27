@@ -132,7 +132,7 @@ export function AdminActionForm({
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-3 border border-[var(--border)] bg-white/80 p-4">
+    <form method="post" onSubmit={onSubmit} className="space-y-3 border border-[var(--border)] bg-white/80 p-4">
       <h3 className="font-serif text-lg">{title}</h3>
       {(fields ?? []).map((field) => (
         <label key={field.name} className="block text-sm">

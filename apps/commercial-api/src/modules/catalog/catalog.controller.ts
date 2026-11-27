@@ -5,7 +5,7 @@ import { AppConfigService } from "../../config/config.service.js";
 /** Codes kept out of public plan bullets (architecture / payment internals). */
 const HIDDEN_PUBLIC_FEATURE_CODES = new Set(["sqlite_single_writer", "factus_pay"]);
 
-function sanitizePlanForPublic<T extends { features?: Array<Record<string, unknown>> }>(plan: T) {
+function sanitizePlanForPublic<T extends { features?: Array<Record<string, unknown>>; prices?: Array<Record<string, unknown>> }>(plan: T) {
   const features = (plan.features ?? [])
     .filter((feature) => {
       const code = typeof feature.code === "string" ? feature.code : "";
@@ -15,7 +15,8 @@ function sanitizePlanForPublic<T extends { features?: Array<Record<string, unkno
       const { claimNote: _claimNote, ...rest } = feature;
       return rest;
     });
-  return { ...plan, features };
+  const prices = plan.prices?.map(({ centralPlanId: _centralPlanId, ...price }) => price);
+  return { ...plan, features, prices };
 }
 
 @Controller("catalog")

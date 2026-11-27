@@ -1,6 +1,6 @@
 import "reflect-metadata";
 import { randomUUID } from "node:crypto";
-import { beforeAll, afterAll, describe, expect, it } from "vitest";
+import { beforeAll, afterAll, describe, expect, it, vi } from "vitest";
 
 process.env.NODE_ENV = "test";
 process.env.PORT = "3110";
@@ -306,12 +306,12 @@ describe("commercial-api critical paths", () => {
     const payment = await prisma.payment.findUniqueOrThrow({ where: { referenceCode } });
     expect(payment.status).toBe("PAID");
 
-    // Central origin empty → order stays PAID, provisioning PENDING (PAID+PENDING_PROVISION)
+    // Confirmed payment is retained while the Global operator binds the order.
     const paidOrder = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
     expect(paidOrder.status).toBe("PAID");
     const provision = await prisma.provisioningRequest.findFirst({ where: { orderId: order.id } });
     expect(provision?.status).toBe("PENDING");
-    expect(provision?.lastError).toBe("PENDING_CENTRAL_CREDENTIALS");
+    expect(provision?.lastError).toBe("PROVISION_BINDING_REQUIRED");
     expect(await prisma.paymentAttempt.count({ where: { paymentId: payment.id, status: "SUCCEEDED" } })).toBe(1);
     expect(await prisma.provisioningRequest.count({ where: { orderId: order.id } })).toBe(1);
 
@@ -324,6 +324,123 @@ describe("commercial-api critical paths", () => {
     expect(replay.json().result).toBe("DUPLICATE");
     expect(await prisma.provisioningRequest.count({ where: { orderId: order.id } })).toBe(1);
 
+  });
+
+  it("keeps one checkout and one business profile on concurrent HTTP retries", async () => {
+    const key = randomUUID();
+    const plan = await prisma.plan.create({
+      data: { slug: key, name: "Plan de prueba", description: "Plan de prueba", publicationStatus: "PUBLISHED" },
+    });
+    const price = await prisma.planPrice.create({
+      data: { planId: plan.id, billingInterval: "MONTHLY", version: 1, amountCents: 49900, publicationStatus: "PUBLISHED" },
+    });
+    const cart = (await inject("POST", "/v1/cart")).json();
+    const selection = await inject("POST", `/v1/cart/${cart.sessionToken}/items`, {
+      payload: { planPriceId: price.id, quantity: 1, expectedPriceVersion: 1 },
+    });
+    expect(selection.statusCode).toBe(201);
+    const { PaymentsService } = await import("../src/modules/payments/payments.service.js");
+    const collection = vi.spyOn(app.get(PaymentsService), "createCollectionForOrder")
+      .mockImplementation(input => prisma.payment.create({
+        data: { ...input, provider: "SANDBOX_MOCK", environment: "SANDBOX", referenceCode: key },
+      }));
+    const body = {
+      cartSessionToken: cart.sessionToken, idempotencyKey: key,
+      customer: { email: `${key}@example.test`, fullName: "Cliente fixture" },
+      business: { legalName: "Empresa fixture", cajaCount: 1 },
+    };
+    try {
+      const outcomes = await Promise.all([
+        inject("POST", "/v1/checkout", { payload: body }),
+        inject("POST", "/v1/checkout", { payload: body }),
+      ]);
+      expect(outcomes.map(response => response.statusCode)).toEqual([201, 201]);
+      expect(outcomes[0]!.json().id).toBe(outcomes[1]!.json().id);
+      expect(collection).toHaveBeenCalledTimes(1);
+      const stored = await prisma.order.findUniqueOrThrow({ where: { idempotencyKey: key } });
+      expect(await prisma.businessProfile.count({ where: { customerId: stored.customerId } })).toBe(1);
+
+      const otherCart = (await inject("POST", "/v1/cart")).json();
+      const denied = await inject("POST", "/v1/checkout", {
+        payload: { ...body, cartSessionToken: otherCart.sessionToken },
+      });
+      expect(denied.statusCode).toBe(409);
+      expect(errorCode(denied.json())).toBe("CHECKOUT_KEY_CONFLICT");
+    } finally {
+      collection.mockRestore();
+    }
+  });
+
+  it("binds paid orders through GLOBAL and freezes the Central UUID payload in PostgreSQL", async () => {
+    const unique = randomUUID();
+    const customer = await prisma.commercialCustomer.create({
+      data: { email: `${unique}@example.test`, fullName: "Compra fixture" },
+    });
+    const plan = await prisma.plan.create({
+      data: { slug: unique, name: "Plan fixture", description: "Plan de contrato" },
+    });
+    const price = await prisma.planPrice.create({
+      data: { planId: plan.id, version: 1, billingInterval: "MONTHLY", amountCents: 49900 },
+    });
+    const profile = await prisma.businessProfile.create({
+      data: { customerId: customer.id, legalName: "Empresa fixture" },
+    });
+    const order = await prisma.order.create({
+      data: {
+        orderNumber: unique, idempotencyKey: unique, customerId: customer.id,
+        businessProfileId: profile.id, status: "PENDING_PAYMENT", subtotalCents: 49900, totalCents: 49900,
+        items: { create: { planId: plan.id, planPriceId: price.id, priceVersion: 1, quantity: 1,
+          label: "Plan fixture", unitAmountCents: 49900, lineTotalCents: 49900 } },
+      },
+    });
+    const referenceCode = `CPC-PAY-${unique}`;
+    await prisma.payment.create({
+      data: { orderId: order.id, customerId: customer.id, status: "PENDING", environment: "SANDBOX",
+        provider: "FACTUS_PAY", amountCents: 49900, referenceCode },
+    });
+    const path = `/v1/provisioning/orders/${order.id}/binding`;
+    const payload: { centralTenantId: string; centralPlanId: string } = { centralTenantId: randomUUID(), centralPlanId: randomUUID() };
+    const { AppConfigService } = await import("../src/config/config.service.js");
+    const config = app.get(AppConfigService);
+    const bindAsGlobal = async (body: typeof payload) => {
+      const previous = config.env.ALLOW_ADMIN_TEST_FIXTURE;
+      config.env.ALLOW_ADMIN_TEST_FIXTURE = true;
+      try {
+        return await inject("POST", path, { payload: body, headers: { "x-admin-test-fixture": "GLOBAL_SUPERADMIN" } });
+      } finally {
+        config.env.ALLOW_ADMIN_TEST_FIXTURE = previous;
+      }
+    };
+    const denied = await inject("POST", path, { payload });
+    expect([401, 403]).toContain(denied.statusCode);
+    expect((await bindAsGlobal(payload)).statusCode).toBe(404);
+
+    const webhook = await inject("POST", "/v1/webhooks/factus-pay/collections", {
+      payload: { data: { reference_code: referenceCode, amount: 49900, status: "paid" } },
+      headers: { "x-factus-pay-webhook-key": process.env.FACTUS_PAY_SANDBOX_WEBHOOK_KEY! },
+    });
+    expect(webhook.json().result).toBe("STORED");
+
+    const incorrect = await bindAsGlobal({ ...payload, centralPlanId: plan.id });
+    expect(incorrect.statusCode).toBe(400);
+    for (let retry = 0; retry < 2; retry += 1) {
+      const result = await bindAsGlobal(payload);
+      expect(result.statusCode).toBe(201);
+      expect(result.json()).toMatchObject({ status: "QUEUED" });
+    }
+    const conflicting = await bindAsGlobal({ ...payload, centralTenantId: randomUUID() });
+    expect(conflicting.statusCode).toBe(409);
+
+    expect(await prisma.planPrice.findUnique({ where: { id: price.id } })).toMatchObject({ centralPlanId: payload.centralPlanId });
+    expect(await prisma.businessProfile.findUnique({ where: { id: profile.id } })).toMatchObject({ centralTenantId: payload.centralTenantId });
+    expect(await prisma.order.findUnique({ where: { id: order.id } })).toMatchObject({ status: "PROVISIONING" });
+    const requests = await prisma.provisioningRequest.findMany({ where: { orderId: order.id } });
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).toMatchObject({
+      payload: { planId: payload.centralPlanId, tenantId: payload.centralTenantId, licenseUnits: 1,
+        items: [{ planId: payload.centralPlanId, priceVersion: 1 }] },
+    });
+    expect(await prisma.auditLog.count({ where: { entityId: requests[0]!.id, action: "PROVISIONING_BINDING_PREPARED" } })).toBe(1);
   });
 
   it("sandbox simulate paid does not call Central provision", async () => {

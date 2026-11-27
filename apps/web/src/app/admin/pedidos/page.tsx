@@ -30,7 +30,15 @@ type OrderRow = {
     carrier?: string | null;
     trackingCode?: string | null;
   }>;
-  items?: Array<{ label: string; quantity: number; kitId?: string | null; productId?: string | null }>;
+  businessProfile?: { legalName: string; centralTenantId: string | null } | null;
+  provisioning?: Array<{
+    status: string; lastError: string | null; attemptCount: number;
+    acknowledgedAt: string | null; wirePreparedAt: string | null;
+  }>;
+  items?: Array<{
+    label: string; quantity: number; kitId?: string | null; productId?: string | null;
+    planPriceId?: string | null; planPrice?: { centralPlanId: string | null } | null;
+  }>;
 };
 
 const STATUS_OPTIONS = [
@@ -112,8 +120,17 @@ export default async function AdminPedidosPage({ searchParams }: Props) {
             ) : (
               <div className="grid gap-4 lg:grid-cols-2">
                 {orders.slice(0, 12).map((order) => {
-                  const payment = order.payments?.[0];
+                  const payment = order.payments?.find(item => item.status === "PAID") ?? order.payments?.[0];
                   const shipment = order.shipments?.[0];
+                  const provisioning = order.provisioning?.[0];
+                  const legacy = provisioning && !provisioning.wirePreparedAt &&
+                    (provisioning.attemptCount > 0 || provisioning.acknowledgedAt !== null);
+                  const centralPlanId = order.items?.find(item => item.planPrice?.centralPlanId)?.planPrice?.centralPlanId;
+                  const canBind = provisioning &&
+                    ["PENDING", "QUEUED", "FAILED"].includes(provisioning.status) &&
+                    !provisioning.wirePreparedAt && !legacy && order.businessProfile &&
+                    ["PAID", "PROVISIONING"].includes(order.status) && payment?.status === "PAID" &&
+                    order.items?.some(item => item.planPriceId);
                   return (
                     <div key={order.id} className="space-y-3 border border-[var(--border)] bg-white/80 p-4">
                       <div>
@@ -131,6 +148,34 @@ export default async function AdminPedidosPage({ searchParams }: Props) {
                           ))}
                         </ul>
                       </div>
+
+                      {provisioning && (
+                        <div role="status" className="text-sm">
+                          Aprovisionamiento {provisioning.status}
+                          {legacy ? " · Requiere conciliación de la solicitud anterior en Central." :
+                            provisioning.lastError ? ` · ${provisioning.lastError}` : ""}
+                        </div>
+                      )}
+                      {canBind && (
+                        <AdminActionForm
+                          title={`Vincular pedido de ${order.businessProfile!.legalName} con Central`}
+                          path={`/v1/provisioning/orders/${encodeURIComponent(order.id)}/binding`}
+                          method="POST"
+                          token={token}
+                          submitLabel="Guardar vinculación"
+                          fields={[
+                            {
+                              name: "centralTenantId", label: "UUID de empresa en Central", required: true,
+                              defaultValue: order.businessProfile!.centralTenantId ?? "",
+                              hint: "Usa la empresa autorizada en Central para este comprador.",
+                            },
+                            {
+                              name: "centralPlanId", label: "UUID de plan en Central",
+                              required: true, defaultValue: centralPlanId ?? "",
+                            },
+                          ]}
+                        />
+                      )}
 
                       <AdminActionForm
                         title="Preparar / listo para despacho"

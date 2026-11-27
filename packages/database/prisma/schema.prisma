@@ -233,6 +233,7 @@ model CommercialCustomer {
 
 model BusinessProfile {
   id           String    @id @default(cuid())
+  centralTenantId String? @db.Uuid
   customerId   String
   legalName    String
   tradeName    String?
@@ -453,6 +454,7 @@ model PlanFeature {
 
 model PlanPrice {
   id                String            @id @default(cuid())
+  centralPlanId     String?           @db.Uuid
   planId            String
   version           Int
   billingInterval   BillingInterval
@@ -832,6 +834,7 @@ model ProvisioningRequest {
   status         ProvisioningStatus @default(PENDING)
   idempotencyKey String             @unique
   payload        Json
+  wirePreparedAt DateTime?
   attemptCount   Int                @default(0)
   lastError      String?
   nextRetryAt    DateTime?

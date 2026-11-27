@@ -684,7 +684,7 @@ export class AdminController {
       },
       include: {
         customer: { select: { id: true, fullName: true, email: true } },
-        items: true,
+        items: { include: { planPrice: { select: { centralPlanId: true } } } },
         payments: {
           select: {
             id: true,
@@ -696,7 +696,14 @@ export class AdminController {
           },
         },
         shipments: true,
-        provisioning: { select: { id: true, status: true, lastError: true } },
+        businessProfile: { select: { legalName: true, centralTenantId: true } },
+        provisioning: {
+          orderBy: { createdAt: "desc" }, take: 1,
+          select: {
+            id: true, status: true, lastError: true,
+            attemptCount: true, acknowledgedAt: true, wirePreparedAt: true,
+          },
+        },
       },
       orderBy: { createdAt: "desc" },
       take: 200,

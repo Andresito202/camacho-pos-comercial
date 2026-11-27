@@ -1,7 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ProvisioningService } from "../src/modules/provisioning/provisioning.service.js";
 
-const item = { id: "request-1", attemptCount: 3, idempotencyKey: "order-key", payload: { licenseUnits: 1 } };
+const item = {
+  id: "request-1", attemptCount: 3, idempotencyKey: "order-key",
+  wirePreparedAt: new Date(),
+  payload: {
+    licenseUnits: 1, tenantId: "be6f9fff-55a8-4935-8f56-c3450c5762d2",
+    planId: "8f691da7-47e8-48e8-92e6-eb5ef6362a4d",
+  },
+};
 const receipt = {
   status: "ACCEPTED",
   provisioningId: "provision-id",
@@ -38,11 +45,11 @@ describe("Central provisioning evidence", () => {
     expect(updateMany).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({
         attemptCount: 3,
-        order: { status: { in: ["PAID", "PROVISIONING"] } },
+        order: expect.objectContaining({ status: { in: ["PAID", "PROVISIONING"] } }),
       }),
       data: expect.objectContaining({
         status: "SENT",
-        payload: { licenseUnits: 1, centralLicenseIds: receipt.licenseIds, centralProvisioningId: receipt.provisioningId },
+        payload: { ...item.payload, centralLicenseIds: receipt.licenseIds, centralProvisioningId: receipt.provisioningId },
       }),
     }));
     expect(orderUpdate).not.toHaveBeenCalled();
