@@ -1,5 +1,7 @@
 import "reflect-metadata";
 import { randomUUID } from "node:crypto";
+import { once } from "node:events";
+import { createServer } from "node:http";
 import { beforeAll, afterAll, describe, expect, it, vi } from "vitest";
 
 process.env.NODE_ENV = "test";
@@ -454,10 +456,66 @@ describe("commercial-api critical paths", () => {
     expect(JSON.stringify(queued)).not.toContain(payload.centralTenantId);
     expect(JSON.stringify(queued)).not.toContain(payload.centralPlanId);
 
-    // Fixture for the already-tested worker's persisted Central issuance acknowledgment.
+    const requestId = requests[0]!.id;
+    const workerPath = "/v1/provisioning/worker/run";
+    expect([401, 403]).toContain((await inject("POST", workerPath)).statusCode);
+
+    // Seed an abandoned lease using the same columns as the running worker.
     await prisma.provisioningRequest.update({
-      where: { id: requests[0]!.id }, data: { status: "SENT", acknowledgedAt: new Date() },
+      where: { id: requestId },
+      data: { attemptCount: 1, nextRetryAt: new Date(Date.now() + 60_000) },
     });
+    const issuedLicenseId = randomUUID();
+    let centralCalls = 0;
+    const server = createServer((request, response) => {
+      request.resume();
+      request.on("end", () => {
+        centralCalls += 1;
+        // Give the overlapping workers time to try claiming the same row.
+        setTimeout(() => {
+          response.writeHead(200, { "content-type": "application/json" });
+          response.end(JSON.stringify({
+            status: "DUPLICATE", provisioningId: "test-provision-id",
+            idempotencyKey: request.headers["idempotency-key"], licenseUnits: 1,
+            cajaRule: "ONE_LICENSE_ONE_CAJA", fulfillment: "ALREADY_ISSUED",
+            licenseIds: [issuedLicenseId],
+          }));
+        }, 80);
+      });
+    });
+    server.listen(0, "127.0.0.1");
+    await once(server, "listening");
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("Test Central address missing");
+    const origin = vi.spyOn(config, "centralOrigin").mockReturnValue(`http://127.0.0.1:${address.port}`);
+    const previous = config.env.ALLOW_ADMIN_TEST_FIXTURE;
+    const previousKey = config.env.COMMERCIAL_BRIDGE_KEY;
+    config.env.ALLOW_ADMIN_TEST_FIXTURE = true;
+    config.env.COMMERCIAL_BRIDGE_KEY = randomUUID().replaceAll("-", "");
+    const worker = () => inject("POST", workerPath, { headers: { "x-admin-test-fixture": "GLOBAL_SUPERADMIN" } });
+    try {
+      const deferred = await worker();
+      expect(deferred.statusCode).toBe(201);
+      expect(deferred.json()).toEqual([]);
+      expect(centralCalls).toBe(0);
+      await prisma.provisioningRequest.update({
+        where: { id: requestId }, data: { nextRetryAt: new Date(Date.now() - 1_000) },
+      });
+      const attempts = await Promise.all([worker(), worker(), worker(), worker()]);
+      expect(attempts.map(result => result.statusCode)).toEqual([201, 201, 201, 201]);
+      expect(attempts.flatMap(result => result.json()).filter((result: { status: string }) => result.status === "SENT"))
+        .toEqual([expect.objectContaining({ id: requestId, licenseIds: [issuedLicenseId] })]);
+      expect(centralCalls).toBe(1);
+      expect(await prisma.provisioningRequest.findUnique({ where: { id: requestId } })).toMatchObject({
+        status: "SENT", attemptCount: 2, nextRetryAt: null,
+        payload: { centralLicenseIds: [issuedLicenseId] },
+      });
+    } finally {
+      config.env.ALLOW_ADMIN_TEST_FIXTURE = previous;
+      config.env.COMMERCIAL_BRIDGE_KEY = previousKey;
+      origin.mockRestore();
+      await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+    }
     expect((await inject("GET", paymentPath)).json()).toMatchObject({
       commercialStatus: "PENDING_ACTIVATION",
     });

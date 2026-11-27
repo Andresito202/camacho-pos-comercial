@@ -25,7 +25,6 @@ function worker(body: unknown, updates = 1) {
   const prisma = {
     provisioningRequest: {
       findMany: vi.fn().mockResolvedValue([item]),
-      findUniqueOrThrow: vi.fn().mockResolvedValue(item),
       updateMany,
     },
     order: { update: orderUpdate },
@@ -44,13 +43,18 @@ describe("Central provisioning evidence", () => {
     expect(await service.processDue()).toMatchObject([{ status: "SENT" }]);
     expect(updateMany).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({
-        attemptCount: 3,
+        attemptCount: 4,
         order: expect.objectContaining({ status: { in: ["PAID", "PROVISIONING"] } }),
       }),
       data: expect.objectContaining({
         status: "SENT",
         payload: { ...item.payload, centralLicenseIds: receipt.licenseIds, centralProvisioningId: receipt.provisioningId },
       }),
+    }));
+    expect(updateMany).toHaveBeenCalledTimes(2);
+    expect(updateMany).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      where: expect.objectContaining({ attemptCount: 3 }),
+      data: { attemptCount: { increment: 1 }, nextRetryAt: expect.any(Date) },
     }));
     expect(orderUpdate).not.toHaveBeenCalled();
   });
@@ -70,5 +74,6 @@ describe("Central provisioning evidence", () => {
   it("leaves a concurrent or terminal order unchanged", async () => {
     const { service } = worker(receipt, 0);
     expect(await service.processDue()).toMatchObject([{ status: "UNCHANGED" }]);
+    expect(fetch).not.toHaveBeenCalled();
   });
 });
