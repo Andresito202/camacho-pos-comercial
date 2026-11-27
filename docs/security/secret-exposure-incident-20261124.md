@@ -68,3 +68,65 @@ refs, forks and cached objects can retain the old history after a branch
 rewrite. Obtain a retention and removal decision for those references before
 cutover. Keep the incident open until the actual remote historical scanner
 passes and deployment containment is verified.
+
+## Alcance verificado antes de intervenir el remoto
+
+- `main` en `92a2f3d3` no alcanza el commit `2bc74356`. El historial expuesto
+  sí es alcanzable desde seis ramas comerciales y de seguridad. El espejo
+  remoto también mostró once referencias `refs/pull/` afectadas en los PR
+  #1 a #6, incluidas las referencias de merge disponibles. En el inventario
+  consultado no había tags ni forks.
+- `2bc74356` contiene 453 archivos generados bajo `apps/web/.next/`. El primer
+  Dockerfile web de la rama (`f89b43c`) se añadió después de que la salida
+  generada dejó de estar rastreada. Su copia amplia de `apps/web` permitía que
+  un directorio de trabajo reutilizado aportara un `.next` local al contexto.
+  La exclusión actual corta esa vía. Los candidatos son el servicio Compose
+  `web`, imágenes etiquetadas localmente como `camacho-pos-web`, contextos de
+  compilación y paquetes standalone construidos desde directorios reutilizados.
+- La API pública de GitHub devolvió cero deployments y cero artefactos de
+  Actions registrados en el momento de la consulta. Esta evidencia no cubre
+  imágenes locales, registries privados, cachés de builders ni equipos remotos.
+  El destino comercial previsto es Hostinger con Docker Compose, PostgreSQL,
+  Caddy y HTTPS.
+- Se filtró `apps/web/.next/` en un espejo remoto desechable, con
+  `git-filter-repo` 2.47.0. Los árboles de las siete ramas conservaron su
+  identidad, la ruta quedó ausente de todo el historial alcanzable del espejo
+  y `git fsck --full --no-reflogs` pasó. El ensayo de GitHub Actions del PR #5
+  corroboró el escaneo en un espejo filtrado. El escaneo remoto continúa abierto.
+
+### Secuencia de intervención propuesta
+
+1. En cada equipo o VPS que haya servido el portal, registrar la revisión
+   desplegada, el ID y los digests de la imagen `web`, y su procedencia. Para
+   evitar incluir variables de entorno, usar
+   `docker compose ps --all web -q` y para cada contenedor consultar únicamente
+   `docker inspect --format '{{.Image}}' <container-id>`. Del ID obtenido,
+   extraer solo `.RepoDigests` y `.Created` con
+   `docker image inspect --format '{{json .RepoDigests}} {{.Created}}' <image-id>`.
+   Incluir los digests conservados para rollback. Aplicar el procedimiento de
+   rotación y retiro de imágenes cuando exista una coincidencia o la procedencia
+   no pueda reconstruirse.
+2. Antes de solicitar cambios de historial, congelar escrituras en las seis
+   ramas afectadas. Volver a inventariar ramas, tags, forks y refs de PR con
+   `git ls-remote`. Preparar un respaldo cifrado y con vencimiento en el
+   almacenamiento restringido del incidente. Puede generarse desde un
+   espejo con `git bundle create - --all` hacia el cifrador aprobado, sin
+   guardar un bundle en claro. Ensayar la restauración en un entorno aislado
+   y registrar el hash del respaldo cifrado y el inventario de refs.
+3. En un espejo aislado, filtrar solo `apps/web/.next/`. Comparar los árboles
+   de las ramas candidatas, ejecutar `git fsck --full` y repetir Gitleaks con
+   redacción completa y `--all`. Conservar el mapa de commits para coordinar
+   las ramas base, los diffs, las aprobaciones y los clones. Reservar una
+   copia de las descripciones y el estado de revisión de cada PR afectado.
+4. Confirmar el tratamiento de las referencias administradas por GitHub antes
+   de tocar ramas compartidas. Si el corte queda autorizado y viable, usar
+   leases ligados al SHA original por cada rama afectada y conservar `main`
+   fuera de la reescritura mientras su historial siga limpio. Un cambio de
+   historia puede invalidar checks y diffs y exigir realinear clones y PR.
+   GitHub trata `refs/pull/` como referencias de solo lectura para el push.
+   Documentación del procedimiento:
+   [GitHub Docs](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/removing-sensitive-data-from-a-repository).
+5. Volver a comprobar la accesibilidad desde un clon fresco, las refs de PR,
+   el escaneo remoto completo y el CI funcional. Una limpieza local exitosa
+   no certifica el remoto ni sustituye la contención de imágenes. La
+   integración a `main` queda condicionada al resultado del escaneo.
