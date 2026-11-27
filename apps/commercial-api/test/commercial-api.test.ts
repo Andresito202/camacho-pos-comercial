@@ -382,7 +382,7 @@ describe("commercial-api critical paths", () => {
       data: { slug: unique, name: "Plan fixture", description: "Plan de contrato" },
     });
     const price = await prisma.planPrice.create({
-      data: { planId: plan.id, version: 1, billingInterval: "MONTHLY", amountCents: 49900 },
+      data: { planId: plan.id, version: 1, billingInterval: "PERPETUAL", amountCents: 49900 },
     });
     const profile = await prisma.businessProfile.create({
       data: { customerId: customer.id, legalName: "Empresa fixture" },
@@ -520,6 +520,45 @@ describe("commercial-api critical paths", () => {
       commercialStatus: "PENDING_ACTIVATION",
     });
     expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe("PROVISIONING");
+
+    async function buyAgain(version: number) {
+      const orderNumber = `CPC-${randomUUID()}`;
+      const nextOrder = await prisma.order.create({
+        data: {
+          orderNumber, idempotencyKey: orderNumber, customerId: customer.id, businessProfileId: profile.id,
+          status: "PENDING_PAYMENT", subtotalCents: 49900, totalCents: 49900,
+          items: { create: { planId: plan.id, planPriceId: price.id, priceVersion: version,
+            quantity: 1, label: "Plan fixture", unitAmountCents: 49900, lineTotalCents: 49900 } },
+        },
+      });
+      const nextReference = `CPC-PAY-${orderNumber}`;
+      await prisma.payment.create({
+        data: { orderId: nextOrder.id, customerId: customer.id, status: "PENDING", environment: "SANDBOX",
+          provider: "FACTUS_PAY", amountCents: 49900, referenceCode: nextReference },
+      });
+      const send = () => inject("POST", "/v1/webhooks/factus-pay/collections", {
+        payload: { data: { reference_code: nextReference, amount: 49900, status: "paid" } },
+        headers: { "x-factus-pay-webhook-key": process.env.FACTUS_PAY_SANDBOX_WEBHOOK_KEY! },
+      });
+      expect((await send()).json().result).toBe("STORED");
+      expect((await send()).json().result).toBe("DUPLICATE");
+      const requestsForOrder = await prisma.provisioningRequest.findMany({ where: { orderId: nextOrder.id } });
+      expect(requestsForOrder).toHaveLength(1);
+      return {
+        request: requestsForOrder[0]!,
+        state: (await inject("GET", `/v1/payments/${nextReference}`)).json(),
+      };
+    }
+
+    const mapped = await buyAgain(1);
+    expect(mapped.request).toMatchObject({ status: "QUEUED", attemptCount: 0, wirePreparedAt: expect.any(Date),
+      payload: { tenantId: payload.centralTenantId, planId: payload.centralPlanId } });
+    expect(mapped.state).toMatchObject({ commercialStatus: "QUEUED" });
+    expect(await prisma.auditLog.count({ where: { entityId: mapped.request.id, action: "PROVISIONING_BINDING_REUSED" } })).toBe(1);
+
+    const unmapped = await buyAgain(2);
+    expect(unmapped.request).toMatchObject({ status: "PENDING", wirePreparedAt: null });
+    expect(unmapped.state).toMatchObject({ commercialStatus: "WAITING_BINDING" });
   });
 
   it("sandbox simulate paid does not call Central provision", async () => {

@@ -20,6 +20,31 @@ const eligibleOrder = {
   status: { in: [...paidOrderStatuses] }, deletedAt: null, payments: confirmedPayment,
 } satisfies Prisma.OrderWhereInput;
 
+const boundOrderInclude = {
+  items: { include: { planPrice: { select: { planId: true, version: true, centralPlanId: true, billingInterval: true } } } },
+  customer: { select: { email: true } },
+  businessProfile: true,
+} satisfies Prisma.OrderInclude;
+type BoundOrder = Prisma.OrderGetPayload<{ include: typeof boundOrderInclude }>;
+
+function bindingSelection(order: BoundOrder) {
+  const profile = order.businessProfile;
+  if (!profile || profile.deletedAt || profile.customerId !== order.customerId) {
+    return { error: "PROVISION_BUSINESS_REQUIRED" } as const;
+  }
+  const lines = order.items.filter(item => item.planId !== null || item.planPriceId !== null);
+  const first = lines[0];
+  if (!first?.planPriceId || !first.planId ||
+      lines.some(line => line.planPriceId !== first.planPriceId || line.planId !== first.planId)) {
+    return { error: "PROVISION_SINGLE_PLAN_PRICE_REQUIRED" } as const;
+  }
+  if (lines.length > 200) return { error: "PROVISION_PLAN_LINE_LIMIT" } as const;
+  const units = lines.reduce((sum, item) => sum + item.quantity, 0);
+  if (units < 1 || units > 10_000) return { error: "PROVISION_UNITS_INVALID" } as const;
+  return { profile, lines, price: first.planPrice, planId: first.planId, planPriceId: first.planPriceId, units } as const;
+}
+type SelectedBinding = Exclude<ReturnType<typeof bindingSelection>, { error: string }>;
+
 function dueProvisioning(now: Date): Prisma.ProvisioningRequestWhereInput {
   return {
     status: { in: [...retryableStatuses] },
@@ -57,15 +82,14 @@ export class ProvisioningService {
   ) {}
 
   async enqueueForPaidOrder(orderId: string, tx: Prisma.TransactionClient) {
-    const order = await tx.order.findUniqueOrThrow({
-      where: { id: orderId },
-      select: { id: true, orderNumber: true },
+    const order = await tx.order.findFirst({
+      where: { ...eligibleOrder, id: orderId },
+      include: boundOrderInclude,
     });
+    if (!order) return null;
     const idempotencyKey = createHash("sha256").update(`provision:${orderId}`).digest("hex");
     const existing = await tx.provisioningRequest.findUnique({ where: { idempotencyKey } });
-    if (existing) return existing;
-
-    const request = await tx.provisioningRequest.create({
+    const request = existing ?? await tx.provisioningRequest.create({
       data: {
         orderId,
         status: "PENDING",
@@ -74,6 +98,22 @@ export class ProvisioningService {
         lastError: "PROVISION_BINDING_REQUIRED",
       },
     });
+    // Reuse only mappings previously pinned to this customer and exact offer.
+    // Recurring terms and commercial deployment have separate release gates.
+    if (!this.config.isProduction && !request.wirePreparedAt && request.attemptCount === 0 &&
+        request.acknowledgedAt === null && request.status === "PENDING") {
+      const selection = bindingSelection(order);
+      if (!("error" in selection)) {
+        const { price, planId, profile, lines } = selection;
+        const tenant = uuid.safeParse(profile.centralTenantId);
+        const plan = uuid.safeParse(price?.centralPlanId);
+        if (price?.billingInterval === "PERPETUAL" && price.planId === planId &&
+            lines.every(line => line.priceVersion === price.version) && tenant.success && plan.success) {
+          return this.freezeBinding(tx, order, selection, request.id, tenant.data, plan.data);
+        }
+      }
+    }
+    if (existing) return existing;
     await this.audit.record({
       actorType: "SYSTEM",
       action: "PROVISIONING_PENDING_BINDING",
@@ -87,23 +127,13 @@ export class ProvisioningService {
   async bindPaidOrder(orderId: string, actorId: string, centralTenantId: string, centralPlanId: string) {
     return this.prisma.$transaction(async tx => {
       const order = await tx.order.findFirst({
-        where: { id: orderId, deletedAt: null, status: { in: [...paidOrderStatuses] }, payments: confirmedPayment },
-        include: { items: true, customer: { select: { email: true } }, businessProfile: true },
+        where: { ...eligibleOrder, id: orderId },
+        include: boundOrderInclude,
       });
       if (!order) throw new NotFoundException({ code: "PAID_ORDER_NOT_FOUND" });
-      const profile = order.businessProfile;
-      if (!profile || profile.deletedAt || profile.customerId !== order.customerId) {
-        throw new ConflictException({ code: "PROVISION_BUSINESS_REQUIRED" });
-      }
-
-      const lines = order.items.filter(item => item.planId !== null || item.planPriceId !== null);
-      const selection = lines[0];
-      if (!selection?.planPriceId || !selection.planId ||
-          lines.some(line => line.planPriceId !== selection.planPriceId || line.planId !== selection.planId)) {
-        throw new ConflictException({ code: "PROVISION_SINGLE_PLAN_PRICE_REQUIRED" });
-      }
-      const units = lines.reduce((sum, item) => sum + item.quantity, 0);
-      if (units < 1 || units > 10_000) throw new ConflictException({ code: "PROVISION_UNITS_INVALID" });
+      const selection = bindingSelection(order);
+      if ("error" in selection) throw new ConflictException({ code: selection.error });
+      const { profile, planId, planPriceId } = selection;
       const existingKey = createHash("sha256").update(`provision:${orderId}`).digest("hex");
       const request = await tx.provisioningRequest.findUnique({ where: { idempotencyKey: existingKey } });
       if (!request) throw new NotFoundException({ code: "PROVISION_REQUEST_NOT_FOUND" });
@@ -120,7 +150,7 @@ export class ProvisioningService {
 
       const plan = await tx.planPrice.updateMany({
         where: {
-          id: selection.planPriceId, planId: selection.planId,
+          id: planPriceId, planId,
           OR: [{ centralPlanId: null }, { centralPlanId }],
         },
         data: { centralPlanId },
@@ -132,38 +162,48 @@ export class ProvisioningService {
       });
       if (company.count !== 1) throw new ConflictException({ code: "PROVISION_TENANT_BINDING_CONFLICT" });
 
-      const prepared = await tx.provisioningRequest.updateMany({
-        where: {
-          id: request.id, status: { in: [...retryableStatuses] }, wirePreparedAt: null,
-          attemptCount: 0, acknowledgedAt: null,
-          order: { status: { in: [...paidOrderStatuses] }, deletedAt: null, payments: confirmedPayment },
-        },
-        data: {
-          wirePreparedAt: new Date(), status: "QUEUED", nextRetryAt: new Date(), lastError: null,
-          payload: {
-            orderId, orderNumber: order.orderNumber, customerEmail: order.customer.email,
-            businessProfileId: profile.id, tenantId: centralTenantId, planId: centralPlanId,
-            licenseUnits: units, cajaRule: "ONE_LICENSE_ONE_CAJA",
-            items: lines.map(line => ({
-              label: line.label, quantity: line.quantity, planId: centralPlanId,
-              priceVersion: line.priceVersion, unitAmountCents: line.unitAmountCents,
-            })),
-          },
-        },
-      });
-      if (prepared.count !== 1) throw new ConflictException({ code: "PROVISION_BINDING_CHANGED" });
-      const updated = await tx.order.updateMany({
-        where: { id: orderId, deletedAt: null, status: { in: [...paidOrderStatuses] }, payments: confirmedPayment },
-        data: { status: "PROVISIONING" },
-      });
-      if (updated.count !== 1) throw new ConflictException({ code: "PROVISION_ORDER_CHANGED" });
-      await this.audit.record({
-        actorType: "ADMIN", actorId, action: "PROVISIONING_BINDING_PREPARED",
-        entityType: "ProvisioningRequest", entityId: request.id,
-        metadata: { orderId, centralPlanId, centralTenantId, planPriceId: selection.planPriceId },
-      }, tx);
-      return { id: request.id, status: "QUEUED" as const };
+      return this.freezeBinding(tx, order, selection, request.id, centralTenantId, centralPlanId, actorId);
     });
+  }
+
+  private async freezeBinding(
+    tx: Prisma.TransactionClient, order: BoundOrder, selection: SelectedBinding, requestId: string,
+    centralTenantId: string, centralPlanId: string, actorId?: string,
+  ) {
+    const { profile, planPriceId, lines, units } = selection;
+    const orderId = order.id;
+    const prepared = await tx.provisioningRequest.updateMany({
+      where: {
+        id: requestId, status: { in: [...retryableStatuses] }, wirePreparedAt: null,
+        attemptCount: 0, acknowledgedAt: null,
+        order: { status: { in: [...paidOrderStatuses] }, deletedAt: null, payments: confirmedPayment },
+      },
+      data: {
+        wirePreparedAt: new Date(), status: "QUEUED", nextRetryAt: new Date(), lastError: null,
+        payload: {
+          orderId, orderNumber: order.orderNumber, customerEmail: order.customer.email,
+          businessProfileId: profile.id, tenantId: centralTenantId, planId: centralPlanId,
+          licenseUnits: units, cajaRule: "ONE_LICENSE_ONE_CAJA",
+          items: lines.map(line => ({
+            label: line.label, quantity: line.quantity, planId: centralPlanId,
+            priceVersion: line.priceVersion, unitAmountCents: line.unitAmountCents,
+          })),
+        },
+      },
+    });
+    if (prepared.count !== 1) throw new ConflictException({ code: "PROVISION_BINDING_CHANGED" });
+    const updated = await tx.order.updateMany({
+      where: { id: orderId, deletedAt: null, status: { in: [...paidOrderStatuses] }, payments: confirmedPayment },
+      data: { status: "PROVISIONING" },
+    });
+    if (updated.count !== 1) throw new ConflictException({ code: "PROVISION_ORDER_CHANGED" });
+    await this.audit.record({
+      actorType: actorId ? "ADMIN" : "SYSTEM", actorId,
+      action: actorId ? "PROVISIONING_BINDING_PREPARED" : "PROVISIONING_BINDING_REUSED",
+      entityType: "ProvisioningRequest", entityId: requestId,
+      metadata: { orderId, centralPlanId, centralTenantId, planPriceId },
+    }, tx);
+    return { id: requestId, status: "QUEUED" as const };
   }
 
   async processDue(limit = 20) {
