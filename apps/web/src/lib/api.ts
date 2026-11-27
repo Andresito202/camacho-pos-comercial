@@ -17,6 +17,7 @@ import type {
   Cart,
   CartItem,
   CheckoutStatus,
+  CommercialCheckoutStatus,
   CoverageCity,
   Equipment,
   FaqItem,
@@ -1027,12 +1028,13 @@ export async function createCheckout(input: {
 
 export async function getCheckoutStatus(
   id: string,
-): Promise<FetchResult<{ id: string; status: CheckoutStatus }> | null> {
+): Promise<FetchResult<{ id: string; status: CheckoutStatus; commercialStatus?: CommercialCheckoutStatus }> | null> {
   // commercial-api lookup key is payment referenceCode
   const data = await apiFetch<{
     referenceCode?: string;
     id?: string;
     status: string;
+    commercialStatus?: CommercialCheckoutStatus | null;
   }>(`/v1/payments/${encodeURIComponent(id)}`, {
     cache: "no-store",
   });
@@ -1042,6 +1044,7 @@ export async function getCheckoutStatus(
       data: {
         id: data.referenceCode ?? data.id ?? id,
         status: mapPaymentStatus(data.status),
+        ...(data.commercialStatus ? { commercialStatus: data.commercialStatus } : {}),
       },
     };
   }

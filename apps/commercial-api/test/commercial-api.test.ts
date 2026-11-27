@@ -399,6 +399,10 @@ describe("commercial-api critical paths", () => {
         provider: "FACTUS_PAY", amountCents: 49900, referenceCode },
     });
     const path = `/v1/provisioning/orders/${order.id}/binding`;
+    const paymentPath = `/v1/payments/${referenceCode}`;
+    expect((await inject("GET", paymentPath)).json()).toMatchObject({
+      status: "PENDING", commercialStatus: null,
+    });
     const payload: { centralTenantId: string; centralPlanId: string } = { centralTenantId: randomUUID(), centralPlanId: randomUUID() };
     const { AppConfigService } = await import("../src/config/config.service.js");
     const config = app.get(AppConfigService);
@@ -420,6 +424,9 @@ describe("commercial-api critical paths", () => {
       headers: { "x-factus-pay-webhook-key": process.env.FACTUS_PAY_SANDBOX_WEBHOOK_KEY! },
     });
     expect(webhook.json().result).toBe("STORED");
+    expect((await inject("GET", paymentPath)).json()).toMatchObject({
+      status: "PAID", commercialStatus: "WAITING_BINDING",
+    });
 
     const incorrect = await bindAsGlobal({ ...payload, centralPlanId: plan.id });
     expect(incorrect.statusCode).toBe(400);
@@ -441,6 +448,20 @@ describe("commercial-api critical paths", () => {
         items: [{ planId: payload.centralPlanId, priceVersion: 1 }] },
     });
     expect(await prisma.auditLog.count({ where: { entityId: requests[0]!.id, action: "PROVISIONING_BINDING_PREPARED" } })).toBe(1);
+    const queued = (await inject("GET", paymentPath)).json();
+    expect(queued).toMatchObject({ commercialStatus: "QUEUED" });
+    expect(queued).not.toHaveProperty("order");
+    expect(JSON.stringify(queued)).not.toContain(payload.centralTenantId);
+    expect(JSON.stringify(queued)).not.toContain(payload.centralPlanId);
+
+    // Fixture for the already-tested worker's persisted Central issuance acknowledgment.
+    await prisma.provisioningRequest.update({
+      where: { id: requests[0]!.id }, data: { status: "SENT", acknowledgedAt: new Date() },
+    });
+    expect((await inject("GET", paymentPath)).json()).toMatchObject({
+      commercialStatus: "PENDING_ACTIVATION",
+    });
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe("PROVISIONING");
   });
 
   it("sandbox simulate paid does not call Central provision", async () => {

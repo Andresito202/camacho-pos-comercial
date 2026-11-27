@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Button } from "@camacho-pos/ui";
 import { getCheckoutStatus } from "@/lib/api";
+import type { CommercialCheckoutStatus } from "@/lib/types";
 import { buildMetadata } from "@/lib/seo";
 
 export const metadata = buildMetadata({
@@ -9,6 +10,13 @@ export const metadata = buildMetadata({
   path: "/checkout/estado",
   noIndex: true,
 });
+
+const commercialLabels: Record<CommercialCheckoutStatus, string> = {
+  WAITING_BINDING: "Pendiente de vincular la empresa y el plan.",
+  QUEUED: "Solicitud en cola de aprovisionamiento.",
+  PENDING_ACTIVATION: "Licencia registrada en Central. Activación pendiente.",
+  REQUIRES_REVIEW: "La solicitud requiere revisión por soporte comercial.",
+};
 
 type Props = { searchParams: Promise<{ id?: string }> };
 
@@ -39,9 +47,10 @@ export default async function CheckoutStatusPage({ searchParams }: Props) {
           </p>
           <p className="text-sm text-[var(--muted)]">Fuente: {result.source}</p>
           {result.data.status === "pagado" ? (
-            <p className="text-[var(--steel)]">
-              Siguiente paso: revisa <Link href="/descargas" className="underline">Descargas</Link> para instalar la app en
-              Windows o Android. Los cajeros no operan en esta web.
+            <p role="status" className="text-[var(--steel)]">
+              {result.data.commercialStatus
+                ? commercialLabels[result.data.commercialStatus]
+                : "Consulta el estado de tu pedido con soporte comercial."}
             </p>
           ) : (
             <p className="text-[var(--steel)]">

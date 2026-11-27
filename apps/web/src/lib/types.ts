@@ -160,6 +160,9 @@ export type Cart = {
   currency: "COP";
 };
 
+export type CommercialCheckoutStatus =
+  | "WAITING_BINDING" | "QUEUED" | "PENDING_ACTIVATION" | "REQUIRES_REVIEW";
+
 export type CheckoutStatus = "pendiente" | "pagado" | "rechazado" | "expirado";
 
 export type AdminSession = {
