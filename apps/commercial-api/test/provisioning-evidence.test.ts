@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ProvisioningService } from "../src/modules/provisioning/provisioning.service.js";
 
+const databaseNow = new Date("2026-11-27T12:00:00.000Z");
 const item = {
   id: "request-1", attemptCount: 3, idempotencyKey: "order-key",
   wirePreparedAt: new Date(),
@@ -23,6 +24,7 @@ function worker(body: unknown, updates = 1) {
   const updateMany = vi.fn().mockResolvedValue({ count: updates });
   const orderUpdate = vi.fn();
   const prisma = {
+    $queryRaw: vi.fn().mockResolvedValue([{ now: databaseNow }]),
     provisioningRequest: {
       findMany: vi.fn().mockResolvedValue([item]),
       updateMany,
@@ -54,7 +56,7 @@ describe("Central provisioning evidence", () => {
     expect(updateMany).toHaveBeenCalledTimes(2);
     expect(updateMany).toHaveBeenNthCalledWith(1, expect.objectContaining({
       where: expect.objectContaining({ attemptCount: 3 }),
-      data: { attemptCount: { increment: 1 }, nextRetryAt: expect.any(Date) },
+      data: { attemptCount: { increment: 1 }, nextRetryAt: new Date(databaseNow.getTime() + 60_000) },
     }));
     expect(orderUpdate).not.toHaveBeenCalled();
   });
@@ -69,6 +71,9 @@ describe("Central provisioning evidence", () => {
     expect(updateMany).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ status: "FAILED", lastError }),
     }));
+    const retryAt = updateMany.mock.calls[1]![0].data.nextRetryAt as Date;
+    expect(retryAt.getTime() - databaseNow.getTime()).toBeGreaterThanOrEqual(384_000);
+    expect(retryAt.getTime() - databaseNow.getTime()).toBeLessThanOrEqual(480_000);
   });
 
   it("leaves a concurrent or terminal order unchanged", async () => {

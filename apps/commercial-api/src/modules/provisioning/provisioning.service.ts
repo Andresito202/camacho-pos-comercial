@@ -168,7 +168,7 @@ export class ProvisioningService {
 
   async processDue(limit = 20) {
     const due = await this.prisma.provisioningRequest.findMany({
-      where: dueProvisioning(new Date()),
+      where: dueProvisioning(await this.databaseTime()),
       select: { id: true, attemptCount: true, idempotencyKey: true, payload: true },
       take: limit,
       orderBy: [{ nextRetryAt: "asc" }, { createdAt: "asc" }, { id: "asc" }],
@@ -181,6 +181,11 @@ export class ProvisioningService {
     return results;
   }
 
+  private async databaseTime(): Promise<Date> {
+    const [value] = await this.prisma.$queryRaw<{ now: Date }[]>`SELECT statement_timestamp() AS now`;
+    return value!.now;
+  }
+
   private async attemptSend(item: Pick<Prisma.ProvisioningRequestGetPayload<object>,
     "id" | "attemptCount" | "idempotencyKey" | "payload">) {
     const { id } = item;
@@ -191,7 +196,7 @@ export class ProvisioningService {
 
     // Reserve the attempt before the outbound call. The same durable deadline
     // makes an interrupted attempt eligible again without an in-memory lock.
-    const now = new Date();
+    const now = await this.databaseTime();
     const claim = await this.prisma.provisioningRequest.updateMany({
       where: { ...dueProvisioning(now), id, attemptCount: item.attemptCount },
       data: { nextRetryAt: new Date(now.getTime() + attemptLeaseMs), attemptCount: { increment: 1 } },
@@ -211,18 +216,21 @@ export class ProvisioningService {
       return result.count === 1;
     };
     const retryDelay = Math.min(maxRetryDelayMs, 60_000 * 2 ** Math.min(6, item.attemptCount));
-    const retryAt = () => new Date(Date.now() + randomInt(Math.floor(retryDelay * 0.8), retryDelay + 1));
+    const retryAt = async () => {
+      const databaseNow = await this.databaseTime();
+      return new Date(databaseNow.getTime() + randomInt(Math.floor(retryDelay * 0.8), retryDelay + 1));
+    };
     // Central's current order issuer gives licenses no expiry. Keep this path
     // disabled in production while commercial term and activation are uncertified.
     if (this.config.isProduction) {
-      const saved = await persist({ status: "PENDING", lastError: "PROVISION_PRODUCTION_NOT_CERTIFIED", nextRetryAt: retryAt() });
+      const saved = await persist({ status: "PENDING", lastError: "PROVISION_PRODUCTION_NOT_CERTIFIED", nextRetryAt: await retryAt() });
       return { id, status: saved ? "PENDING" : "UNCHANGED" };
     }
     const origin = this.config.centralOrigin();
     const bridgeKey = this.config.env.COMMERCIAL_BRIDGE_KEY?.trim() ?? "";
     if (!origin || bridgeKey.length < 32) {
       const lastError = origin ? "PENDING_COMMERCIAL_BRIDGE_KEY" : "PENDING_CENTRAL_CREDENTIALS";
-      const saved = await persist({ status: "PENDING", lastError, nextRetryAt: retryAt() });
+      const saved = await persist({ status: "PENDING", lastError, nextRetryAt: await retryAt() });
       if (saved) this.logger.warn(`Provisioning ${id} deferred: ${lastError}`);
       return { id, status: saved ? "PENDING" : "UNCHANGED" };
     }
@@ -261,7 +269,7 @@ export class ProvisioningService {
       const saved = await persist({
         status: issued ? "SENT" : "QUEUED",
         lastError: issued ? null : `CENTRAL_FULFILLMENT_${body.fulfillment}`,
-        nextRetryAt: issued ? null : retryAt(),
+        nextRetryAt: issued ? null : await retryAt(),
         acknowledgedAt: new Date(),
         ...(issued ? {
           payload: {
@@ -275,7 +283,7 @@ export class ProvisioningService {
       return { id, status: issued ? "SENT" : "QUEUED", fulfillment: body.fulfillment, licenseIds: body.licenseIds };
     } catch (error) {
       const message = error instanceof Error ? error.message : "UNKNOWN";
-      const saved = await persist({ status: "FAILED", lastError: message, nextRetryAt: retryAt() });
+      const saved = await persist({ status: "FAILED", lastError: message, nextRetryAt: await retryAt() });
       return { id, status: saved ? "FAILED" : "UNCHANGED" };
     }
   }
