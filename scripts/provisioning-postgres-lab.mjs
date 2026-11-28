@@ -121,7 +121,7 @@ function databaseUrl(db, role = adminUrl.username) {
 const centralAdminUrl = databaseUrl(centralDatabase);
 const portalUrl = databaseUrl(portalDatabase);
 const runtimeUrl = databaseUrl(centralDatabase, "pos_platform_app");
-let http, portal, prisma, central, runtime, local;
+let http, portal, prisma, central, runtime, local, web;
 const environmentId = "PORTAL_BRIDGE_LAB";
 const repositoryCommit = execFileSync(
   "git",
@@ -381,6 +381,19 @@ try {
     }),
   ]);
   assert.equal((await fetch(origin + "/health")).status, 200);
+  let checkoutPage;
+  if (process.env.CAMACHO_BRIDGE_LAB_WEB === "1") {
+    const frontend = await startCheckoutWeb(origin);
+    web = frontend.process;
+    checkoutPage = new URL("/checkout/estado", frontend.origin);
+    checkoutPage.searchParams.set("id", referenceCode);
+  }
+  const checkCheckoutPage = async (label) => {
+    if (!checkoutPage) return;
+    const response = await fetch(checkoutPage);
+    assert.equal(response.status, 200);
+    assert.ok((await response.text()).includes(label), `Checkout page did not render: ${label}`);
+  };
   const event = {
     data: { reference_code: referenceCode, amount: 59900, status: "paid" },
   };
@@ -521,6 +534,7 @@ try {
     assert.equal(await statusFromPortal(), "PENDING_DELIVERY");
     assert.equal((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).status, "PROVISIONING");
   }, 40_000, () => stderr);
+  await checkCheckoutPage("Activación confirmada. Entrega de equipos pendiente.");
   assert.deepEqual((await (await activationStatus()).json()).receipts,
     [{ licenseId, activationId: activated.activationId, receiptId: ack.receiptId }]);
   // Use the admin API for logistics. The existence of a physical delivery is the fixture.
@@ -538,6 +552,7 @@ try {
   assert.equal(await prisma.auditLog.count({ where: { action: "PROVISIONING_ORDER_COMPLETED", entityId: order.id } }), 1);
   assert.equal((await (await pay()).json()).result, "DUPLICATE");
   assert.equal(await statusFromPortal(), "FULFILLED");
+  await checkCheckoutPage("Pedido completado.");
   console.log(
     JSON.stringify({
       webhook: "STORED_AND_DUPLICATE",
@@ -551,6 +566,7 @@ try {
       localSQLite: "ACCEPTED_AFTER_RESTART",
       receiptId: ack.receiptId,
       portalStates: ["WAITING_BINDING", "PENDING_ACTIVATION", "PENDING_DELIVERY", "FULFILLED"],
+      ...(checkoutPage ? { checkoutPage: "NEXT_SSR_PENDING_DELIVERY_AND_FULFILLED" } : {}),
       centralDatabase,
       portalDatabase,
       repositoryCommit,
@@ -558,9 +574,11 @@ try {
   );
 } finally {
   local?.close();
-  if (portal?.exitCode === null) {
-    portal.kill("SIGTERM");
-    await once(portal, "exit");
+  for (const child of [web, portal]) {
+    if (child?.exitCode === null && child.signalCode === null) {
+      child.kill("SIGTERM");
+      await once(child, "exit");
+    }
   }
   if (http) await new Promise((resolve) => http.close(resolve));
   await Promise.all([
@@ -640,4 +658,35 @@ async function loginLabGlobal(db, pool) {
     origin, method: "POST", fetchSite: "same-origin" }, "LICENSE_ISSUE");
   assert.ok(session);
   return { sessionId: session, sessions, origin, cookie: login.setCookie.split(";", 1)[0], csrfToken: login.csrfToken };
+}
+
+
+async function startCheckoutWeb(apiOrigin) {
+  const child = spawn(process.execPath, ["--input-type=module", "-e", `
+    import { createServer } from "node:http";
+    import next from "next";
+    const app = next({ dev: true, quiet: true });
+    await app.prepare();
+    const server = createServer(app.getRequestHandler());
+    server.listen(0, "127.0.0.1", () => process.send("http://127.0.0.1:" + server.address().port));
+  `], {
+    cwd: join(portalRepo, "apps/web"),
+    stdio: ["ignore", "pipe", "pipe", "ipc"],
+    env: { ...process.env, NODE_ENV: "development", COMMERCIAL_API_INTERNAL_URL: apiOrigin,
+      NEXT_PUBLIC_API_URL: apiOrigin, NEXT_TELEMETRY_DISABLED: "1" },
+  });
+  let stderr = "";
+  child.stdout.on("data", () => {});
+  child.stderr.on("data", chunk => { stderr += String(chunk); });
+  try {
+    const origin = await Promise.race([
+      once(child, "message").then(([address]) => address),
+      once(child, "exit").then(() => { throw Error("Checkout web laboratory exited: " + stderr); }),
+      delay(20_000, null, { ref: false }).then(() => { throw Error("Checkout web laboratory startup timeout: " + stderr); }),
+    ]);
+    return { process: child, origin };
+  } catch (error) {
+    if (child.exitCode === null && child.signalCode === null) child.kill("SIGTERM");
+    throw error;
+  }
 }
