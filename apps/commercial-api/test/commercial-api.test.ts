@@ -442,15 +442,22 @@ describe("commercial-api critical paths", () => {
     const payload: { centralTenantId: string; centralPlanId: string } = { centralTenantId: randomUUID(), centralPlanId: randomUUID() };
     const { AppConfigService } = await import("../src/config/config.service.js");
     const config = app.get(AppConfigService);
-    const bindAsGlobal = async (body: typeof payload) => {
-      const previous = config.env.ALLOW_ADMIN_TEST_FIXTURE;
-      config.env.ALLOW_ADMIN_TEST_FIXTURE = true;
+    const { SessionBridgeService } = await import("../src/common/auth/session-bridge.service.js");
+    const services = app.get(SessionBridgeService);
+    const centralSession = { authenticated: true, role: "SUPERADMIN_GLOBAL", subjectId: randomUUID(),
+      tenantId: "global", verifiedAuthority: "GLOBAL" } as const;
+    const globalHeader = { authorization: `Bearer ${randomUUID()}` };
+    const asGlobal = async (route: string, body?: typeof payload) => {
+      const central = vi.spyOn(services, "resolve").mockImplementation(async authorization =>
+        authorization === globalHeader.authorization ? centralSession :
+          { authenticated: false, role: "ANONYMOUS", subjectId: null, tenantId: null });
       try {
-        return await inject("POST", path, { payload: body, headers: { "x-admin-test-fixture": "GLOBAL_SUPERADMIN" } });
+        return await inject("POST", route, { ...(body ? { payload: body } : {}), headers: globalHeader });
       } finally {
-        config.env.ALLOW_ADMIN_TEST_FIXTURE = previous;
+        central.mockRestore();
       }
     };
+    const bindAsGlobal = (body: typeof payload) => asGlobal(path, body);
     const denied = await inject("POST", path, { payload });
     expect([401, 403]).toContain(denied.statusCode);
     expect((await bindAsGlobal(payload)).statusCode).toBe(404);
@@ -464,6 +471,15 @@ describe("commercial-api critical paths", () => {
       status: "PAID", commercialStatus: "WAITING_BINDING",
     });
 
+    const priorFixture = config.env.ALLOW_ADMIN_TEST_FIXTURE;
+    config.env.ALLOW_ADMIN_TEST_FIXTURE = true;
+    try {
+      const fixture = await inject("POST", path, { payload, headers: { "x-admin-test-fixture": "GLOBAL_SUPERADMIN" } });
+      expect(fixture.statusCode).toBe(403);
+      expect(errorCode(fixture.json())).toBe("PROVISION_CENTRAL_GLOBAL_REQUIRED");
+    } finally {
+      config.env.ALLOW_ADMIN_TEST_FIXTURE = priorFixture;
+    }
     const incorrect = await bindAsGlobal({ ...payload, centralPlanId: plan.id });
     expect(incorrect.statusCode).toBe(400);
     for (let retry = 0; retry < 2; retry += 1) {
@@ -522,14 +538,13 @@ describe("commercial-api critical paths", () => {
     const address = server.address();
     if (!address || typeof address === "string") throw new Error("Test Central address missing");
     const origin = vi.spyOn(config, "centralOrigin").mockReturnValue(`http://127.0.0.1:${address.port}`);
-    const previous = config.env.ALLOW_ADMIN_TEST_FIXTURE;
     const previousKey = config.env.COMMERCIAL_BRIDGE_KEY;
-    config.env.ALLOW_ADMIN_TEST_FIXTURE = true;
     config.env.COMMERCIAL_BRIDGE_KEY = randomUUID().replaceAll("-", "");
     const { ProvisioningScheduler } = await import("../src/modules/provisioning/provisioning-scheduler.js");
     const scheduler = app.get(ProvisioningScheduler);
     const previousScheduler = config.env.COMMERCIAL_PROVISIONING_WORKER_ENABLED;
-    const worker = () => inject("POST", workerPath, { headers: { "x-admin-test-fixture": "GLOBAL_SUPERADMIN" } });
+    const workerSession = vi.spyOn(services, "resolve").mockResolvedValue(centralSession);
+    const worker = () => inject("POST", workerPath, { headers: globalHeader });
     try {
       const deferred = await worker();
       expect(deferred.statusCode).toBe(201);
@@ -562,7 +577,7 @@ describe("commercial-api critical paths", () => {
     } finally {
       await scheduler.onModuleDestroy();
       config.env.COMMERCIAL_PROVISIONING_WORKER_ENABLED = previousScheduler;
-      config.env.ALLOW_ADMIN_TEST_FIXTURE = previous;
+      workerSession.mockRestore();
       config.env.COMMERCIAL_BRIDGE_KEY = previousKey;
       origin.mockRestore();
       await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));

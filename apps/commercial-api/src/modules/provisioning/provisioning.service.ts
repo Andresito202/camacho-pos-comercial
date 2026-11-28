@@ -6,6 +6,9 @@ import { PRISMA } from "../../common/prisma.tokens.js";
 import { AppConfigService } from "../../config/config.service.js";
 import { AuditService } from "../audit/audit.service.js";
 
+export function commercialProvisioningKey(orderId: string): string {
+  return createHash("sha256").update(`provision:${orderId}`).digest("hex");
+}
 const retryableStatuses = ["PENDING", "QUEUED", "FAILED"] as const;
 const activationPollMs = 30_000;
 const billingInterval = z.enum(["PERPETUAL", "MONTHLY", "ANNUAL"]);
@@ -108,7 +111,7 @@ export class ProvisioningService {
       include: boundOrderInclude,
     });
     if (!order) return null;
-    const idempotencyKey = createHash("sha256").update(`provision:${orderId}`).digest("hex");
+    const idempotencyKey = commercialProvisioningKey(orderId);
     const existing = await tx.provisioningRequest.findUnique({ where: { idempotencyKey } });
     const request = existing ?? await tx.provisioningRequest.create({
       data: {
@@ -157,7 +160,7 @@ export class ProvisioningService {
       const selection = bindingSelection(order);
       if ("error" in selection) throw new ConflictException({ code: selection.error });
       const { profile, planId, planPriceId } = selection;
-      const existingKey = createHash("sha256").update(`provision:${orderId}`).digest("hex");
+      const existingKey = commercialProvisioningKey(orderId);
       const request = await tx.provisioningRequest.findUnique({ where: { idempotencyKey: existingKey } });
       if (!request) throw new NotFoundException({ code: "PROVISION_REQUEST_NOT_FOUND" });
       if (request.wirePreparedAt) {
@@ -312,8 +315,13 @@ export class ProvisioningService {
       return { id, status: saved ? deferredStatus : "UNCHANGED" };
     }
 
-    const path = this.config.env.CENTRAL_PROVISIONING_PATH || "/v1/commercial/provisioning";
     try {
+      if (payload.paidOrder) {
+        const central = new URL(origin);
+        if (central.protocol !== "https:" || central.origin !== origin) throw new Error("CENTRAL_PAID_ORDER_HTTPS_REQUIRED");
+      }
+      const path = payload.paidOrder ? "/v1/commercial/provisioning"
+        : this.config.env.CENTRAL_PROVISIONING_PATH || "/v1/commercial/provisioning";
       const lease = item.attemptCount + 1;
       if (item.status === "SENT") {
         const bound = issuance.parse(payload);

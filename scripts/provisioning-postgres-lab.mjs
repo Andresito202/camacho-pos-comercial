@@ -354,6 +354,7 @@ try {
         ...process.env,
         NODE_ENV: "test",
         CENTRAL_SESSION_BRIDGE_ENABLED: "true",
+        ALLOW_ADMIN_TEST_FIXTURE: "1",
         DATABASE_URL: portalUrl,
         NODE_EXTRA_CA_CERTS: ca,
         CENTRAL_AUTHORITY_ORIGIN: `https://127.0.0.1:${centralPort}`,
@@ -425,6 +426,13 @@ try {
   const bindingPath = `/v1/provisioning/orders/${order.id}/binding`;
   const binding = { centralTenantId: tenantId, centralCompanyId: companyId, centralPlanId: planId };
   assert.equal((await adminAction(bindingPath, "POST", binding, false)).status, 403);
+  const fakeSuperadmin = (path, method, input, headers) => fetch(origin + path, { method,
+    headers: { "content-type": "application/json", ...headers }, body: JSON.stringify(input) });
+  for (const headers of [{ "x-admin-test-fixture": "GLOBAL_SUPERADMIN" }, { authorization: "Bearer central-test:SUPERADMIN_GLOBAL" }]) {
+    const rejected = await fakeSuperadmin(bindingPath, "POST", binding, headers);
+    assert.equal(rejected.status, 403);
+    assert.equal((await rejected.json()).code, "PROVISION_CENTRAL_GLOBAL_REQUIRED");
+  }
   const authorizedBinding = await adminAction(bindingPath, "POST", binding);
   assert.equal(authorizedBinding.status, 201, await authorizedBinding.text());
   const idempotencyKey = sha(`provision:${order.id}`).toString("hex");
@@ -539,6 +547,12 @@ try {
     [{ licenseId, activationId: activated.activationId, receiptId: ack.receiptId }]);
   // Use the admin API for logistics. The existence of a physical delivery is the fixture.
   for (const action of ["MARK_READY", "SHIP", "DELIVER"]) {
+    if (action === "DELIVER") {
+      const rejected = await fakeSuperadmin(`/v1/admin/pedidos/${order.id}`, "PATCH",
+        { action }, { "x-admin-test-fixture": "GLOBAL_SUPERADMIN" });
+      assert.equal(rejected.status, 403);
+      assert.equal((await rejected.json()).code, "PROVISION_CENTRAL_GLOBAL_REQUIRED");
+    }
     const response = await adminAction(`/v1/admin/pedidos/${order.id}`, "PATCH", { action, ...(action === "SHIP" ? { trackingCode: "LAB-" + random } : {}) });
     assert.equal(response.status, 200, await response.text());
   }
@@ -562,6 +576,7 @@ try {
       licensePersisted: Boolean(licenseId),
       globalAllocation: "MFA_AND_SCOPE_VERIFIED",
       portalAdmin: "CENTRAL_BEARER_INTROSPECTED",
+      provisioningFixtures: "BINDING_AND_DELIVERY_REJECTED",
       lostResponse: "RECOVERED_SAME_RECEIPT",
       localSQLite: "ACCEPTED_AFTER_RESTART",
       receiptId: ack.receiptId,

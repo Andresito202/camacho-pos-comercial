@@ -4,6 +4,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   NotFoundException,
   Param,
@@ -15,6 +16,7 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { z } from "zod";
+import { commercialProvisioningKey } from "../provisioning/provisioning.service.js";
 import { MoneyCentsSchema } from "@camacho-pos-comercial/contracts";
 import type { PrismaClient } from "@camacho-pos-comercial/database";
 import { AdminGuard } from "../../common/auth/admin.guard.js";
@@ -785,6 +787,14 @@ export class AdminController {
         case "DELIVER": {
           if (!latestShipment || latestShipment.status !== "SHIPPED") {
             throw new BadRequestException({ code: "SHIPMENT_NOT_SHIPPED" });
+          }
+          const binding = await tx.provisioningRequest.findUnique({
+            where: { idempotencyKey: commercialProvisioningKey(order.id) },
+            select: { payload: true },
+          });
+          const paidOrder = z.object({ paidOrder: z.object({ companyId: z.string().uuid() }) }).safeParse(binding?.payload);
+          if (paidOrder.success && req.commercialSession?.verifiedAuthority !== "GLOBAL") {
+            throw new ForbiddenException({ code: "PROVISION_CENTRAL_GLOBAL_REQUIRED" });
           }
           const shipment = await tx.shipment.update({
             where: { id: latestShipment.id },

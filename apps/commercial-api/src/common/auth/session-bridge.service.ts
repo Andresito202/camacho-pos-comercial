@@ -10,6 +10,7 @@ export interface BridgedSession {
   readonly subjectId: string | null;
   readonly tenantId: string | null;
   readonly reason?: string;
+  readonly verifiedAuthority?: "GLOBAL";
 }
 
 /**
@@ -89,6 +90,7 @@ export class SessionBridgeService {
     try {
       const response = await fetch(`${origin}/v1/sessions/introspect`, {
         method: "POST",
+        redirect: "error",
         headers: {
           authorization: `Bearer ${token}`,
           accept: "application/json",
@@ -123,11 +125,14 @@ export class SessionBridgeService {
         };
       }
       const role = mapCentralRole(body.role, body.authority);
+      const verifiedGlobal = new URL(origin).protocol === "https:" && body.active === true &&
+        body.authority === "GLOBAL" && body.role === "SUPERADMIN_GLOBAL" && body.tenantId === "global";
       return {
         authenticated: true,
         role,
         subjectId: body.subjectId ?? null,
         tenantId: body.tenantId ?? null,
+        ...(verifiedGlobal ? { verifiedAuthority: "GLOBAL" as const } : {}),
       };
     } catch {
       return {
