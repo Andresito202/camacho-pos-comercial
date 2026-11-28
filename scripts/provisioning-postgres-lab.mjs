@@ -61,7 +61,7 @@ const [
     PostgresCommercialPortalBridgeStore,
     createCommercialPortalBridgeHandler,
   },
-  { ExplicitTestGlobalSessionGate },
+  { GlobalAdministrationSessionGate },
   { businessTestTls },
   { LicenseCapacityAuthority, LICENSE_ACTIVATION_PATH },
   { createLicenseCapacityHandler },
@@ -84,7 +84,7 @@ const [
   migration("postgres-007-runner"),
   migration("postgres-commercial-runner"),
   fromPos("apps/central-authority/src/commercial-portal-bridge/index.ts"),
-  fromPos("apps/central-authority/tests/commercial-portal-test-gate.ts"),
+  fromPos("apps/central-authority/src/commercial-portal-bridge/global-session-gate.ts"),
   fromPos("apps/central-authority/tests/helpers/business-test-tls.ts"),
   fromPos("apps/central-authority/src/license-capacity-authority.ts"),
   fromPos("apps/central-authority/src/license-capacity-runtime.ts"),
@@ -229,17 +229,19 @@ try {
   const authority = new LicenseCapacityAuthority(runtime, policy,
     { keyId, privateKey: licenseKey.privateKey, environment: "PREPRODUCTION" },
     { reauthenticationMs: 300_000, lockTimeoutMs: 3_000, statementTimeoutMs: 10_000 });
-  const sessionId = await loginLabGlobal(central, runtime);
+  const global = await loginLabGlobal(central, runtime);
+  const { sessionId } = global;
   const bridgeKey = randomBytes(32).toString("hex"),
     webhookKey = randomBytes(32).toString("hex");
   const bridgeStore = new PostgresCommercialPortalBridgeStore(runtime);
-  const gate = new ExplicitTestGlobalSessionGate();
+  const gate = new GlobalAdministrationSessionGate(global.sessions, runtime, global.origin);
   const handler = createCommercialPortalBridgeHandler(
     new CommercialPortalBridgeService(bridgeStore, {
       bridgeKey,
       trialWebhookKey: randomBytes(32).toString("hex"),
       licenseIssuer: new PostgresCommercialLicenseIssuer(runtime),
       recoverBoundProvisioning: true,
+      isGlobalSessionActive: value => gate.isSessionActive(value),
     }),
     gate,
     authority,
@@ -351,7 +353,7 @@ try {
       env: {
         ...process.env,
         NODE_ENV: "test",
-        ALLOW_ADMIN_TEST_FIXTURE: "1",
+        CENTRAL_SESSION_BRIDGE_ENABLED: "true",
         DATABASE_URL: portalUrl,
         NODE_EXTRA_CA_CERTS: ca,
         CENTRAL_AUTHORITY_ORIGIN: `https://127.0.0.1:${centralPort}`,
@@ -395,12 +397,21 @@ try {
   assert.equal((await (await pay()).json()).result, "DUPLICATE");
   const statusFromPortal = async () => (await (await fetch(origin + `/v1/payments/${referenceCode}`)).json()).commercialStatus;
   assert.equal(await statusFromPortal(), "WAITING_BINDING");
+  const mint = (csrfToken = global.csrfToken) => transport(new URL("/v1/sessions/commercial-bridge/mint", centralOrigin), {
+    method: "POST", headers: { "content-type": "application/json", "x-central-commercial-bridge-key": bridgeKey,
+      cookie: global.cookie, "x-csrf-token": csrfToken },
+    body: JSON.stringify({ role: "SUPERADMIN_GLOBAL", ttlSeconds: 180, jti: uuidV7() }),
+  });
+  assert.equal((await mint("invalid")).status, 401);
+  const minted = await mint();
+  assert.equal(minted.status, 200);
+  const session = await minted.json();
   const adminAction = (path, method, input, authorize = true) => fetch(origin + path, { method, redirect: "error",
-    headers: { "content-type": "application/json", ...(authorize ? { "x-admin-test-fixture": "GLOBAL_SUPERADMIN" } : {}) },
+    headers: { "content-type": "application/json", ...(authorize ? { authorization: `Bearer ${session.accessToken}` } : {}) },
     body: JSON.stringify(input) });
   const bindingPath = `/v1/provisioning/orders/${order.id}/binding`;
   const binding = { centralTenantId: tenantId, centralCompanyId: companyId, centralPlanId: planId };
-  assert.equal((await adminAction(bindingPath, "POST", binding, false)).status, 401);
+  assert.equal((await adminAction(bindingPath, "POST", binding, false)).status, 403);
   const authorizedBinding = await adminAction(bindingPath, "POST", binding);
   assert.equal(authorizedBinding.status, 201, await authorizedBinding.text());
   const idempotencyKey = sha(`provision:${order.id}`).toString("hex");
@@ -498,6 +509,11 @@ try {
     payloadChecksum: downloaded.payloadChecksum, timeoutMs: 10_000, provider };
   await assert.rejects(acknowledgeLicenseLocalAcceptance({ ...acceptance, payloadChecksum: "a".repeat(64) }, transport),
     /ACK_REJECTED/);
+  await assert.rejects(acknowledgeLicenseLocalAcceptance(acceptance, async (...args) => {
+    const committed = await transport(...args);
+    assert.equal(committed.status, 200);
+    throw Error("LAB_DROPPED_COMMITTED_ACK_RESPONSE");
+  }), /LAB_DROPPED_COMMITTED_ACK_RESPONSE/);
   const ack = await acknowledgeLicenseLocalAcceptance(acceptance, transport);
   assert.deepEqual(await acknowledgeLicenseLocalAcceptance(acceptance, transport), ack);
 
@@ -530,6 +546,8 @@ try {
       centralReceipt: "ISSUED",
       licensePersisted: Boolean(licenseId),
       globalAllocation: "MFA_AND_SCOPE_VERIFIED",
+      portalAdmin: "CENTRAL_BEARER_INTROSPECTED",
+      lostResponse: "RECOVERED_SAME_RECEIPT",
       localSQLite: "ACCEPTED_AFTER_RESTART",
       receiptId: ack.receiptId,
       portalStates: ["WAITING_BINDING", "PENDING_ACTIVATION", "PENDING_DELIVERY", "FULFILLED"],
@@ -621,5 +639,5 @@ async function loginLabGlobal(db, pool) {
   const session = await sessions.authorize({ cookie: login.setCookie.split(";", 1)[0], csrfToken: login.csrfToken,
     origin, method: "POST", fetchSite: "same-origin" }, "LICENSE_ISSUE");
   assert.ok(session);
-  return session;
+  return { sessionId: session, sessions, origin, cookie: login.setCookie.split(";", 1)[0], csrfToken: login.csrfToken };
 }
