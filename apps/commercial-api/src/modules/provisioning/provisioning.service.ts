@@ -137,10 +137,8 @@ export class ProvisioningService {
           acknowledgedAt: new Date(),
         },
       });
-      await this.prisma.order.update({
-        where: { id: item.orderId },
-        data: { status: "FULFILLED" },
-      });
+      // This acknowledgment only records delivery to Central. The order stays
+      // in provisioning until the licensing authority confirms activation.
       return { id, status: "SENT" };
     } catch (error) {
       const message = error instanceof Error ? error.message : "UNKNOWN";
