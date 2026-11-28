@@ -21,8 +21,8 @@ export default function SoportePage() {
       </p>
       <div className="mt-8 grid gap-4 md:grid-cols-3">
         {[
-          { t: "Instalación", d: "Guías Electron y Android en Descargas.", href: "/descargas" },
-          { t: "FAQ", d: "Respuestas sobre local-first, roles y facturación.", href: "/preguntas-frecuentes" },
+          { t: "Instalación", d: "Guías Windows y Android en Descargas.", href: "/descargas" },
+          { t: "FAQ", d: "Respuestas sobre venta sin internet, roles y facturación.", href: "/preguntas-frecuentes" },
           { t: "Contacto", d: "Correo y formulario comercial.", href: "/contacto" },
         ].map((item) => (
           <Link key={item.t} href={item.href} className="bg-white/70 p-5">
@@ -34,7 +34,7 @@ export default function SoportePage() {
       <div className="mt-10 rounded border border-[var(--border)] bg-[color-mix(in_srgb,var(--yellow)_12%,white)] p-5">
         <h2 className="font-serif text-2xl">Importante sobre roles</h2>
         <p className="mt-2 text-[var(--steel)]">
-          Superadministrador, administrador y supervisor no son cajeros. Tras iniciar sesión en Central, el cajero debe
+          Superadministrador, administrador y supervisor no son cajeros. Tras iniciar sesión, el cajero debe
           instalar la app de caja — no operar desde este sitio.
         </p>
         <Link href="/descargas" className="mt-4 inline-block"><Button>Ir a descargas</Button></Link>

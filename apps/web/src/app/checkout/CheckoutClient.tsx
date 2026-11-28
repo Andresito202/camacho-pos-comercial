@@ -32,7 +32,7 @@ export function CheckoutClient() {
         event.preventDefault();
         setPending(true);
         setError(null);
-        const form = new FormData(event.currentTarget);
+        const form = new FormData(event.currentTarget as HTMLFormElement);
         const customer = Object.fromEntries(
           ["businessName", "nit", "email", "phone", "city", "notes"].map((key) => [
             key,

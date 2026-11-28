@@ -1,28 +1,254 @@
-import { Table } from "@camacho-pos/ui";
-import { adminFetch } from "@/lib/api";
 import { cookies } from "next/headers";
+import { Table } from "@camacho-pos/ui";
+import {
+  AdminActionForm,
+  AdminEmptyState,
+  AdminFilterForm,
+  AdminSection,
+} from "@/components/admin/AdminClientForms";
+import { adminFetch } from "@/lib/api";
 import { ADMIN_TOKEN_COOKIE } from "@/lib/auth";
 
-export default async function AdminClientesPage() {
+type ClientesPayload = {
+  contacts: Array<{ id: string; fullName: string; email: string; status: string; createdAt: string }>;
+  leads: Array<{ id: string; fullName: string; email: string; status: string; createdAt: string }>;
+  demos: Array<{ id: string; fullName: string; email: string; status: string; createdAt: string }>;
+  customers: Array<{ id: string; fullName: string; email: string; createdAt: string }>;
+};
+
+const STATUS_OPTIONS = [
+  { value: "NEW", label: "NEW" },
+  { value: "CONTACTED", label: "CONTACTED" },
+  { value: "QUALIFIED", label: "QUALIFIED" },
+  { value: "DEMO_SCHEDULED", label: "DEMO_SCHEDULED" },
+  { value: "WON", label: "WON" },
+  { value: "LOST", label: "LOST" },
+  { value: "ARCHIVED", label: "ARCHIVED" },
+];
+
+type Props = { searchParams: Promise<{ status?: string; q?: string }> };
+
+export default async function AdminClientesPage({ searchParams }: Props) {
+  const { status, q } = await searchParams;
   const token = (await cookies()).get(ADMIN_TOKEN_COOKIE)?.value;
-  const rows = (await adminFetch<Array<{ id: string; name?: string; status?: string }>>("/v1/admin/clientes", token)) ?? [];
+  const qs = new URLSearchParams();
+  if (status) qs.set("status", status);
+  if (q) qs.set("q", q);
+  const path = `/v1/admin/clientes${qs.toString() ? `?${qs}` : ""}`;
+  const data = await adminFetch<ClientesPayload>(path, token);
+
+  if (!data) {
+    return (
+      <div>
+        <h1 className="font-serif text-3xl">Clientes y solicitudes</h1>
+        <div className="mt-8">
+          <AdminEmptyState
+            title="No se pudo cargar CRM"
+            detail="El endpoint /v1/admin/clientes no respondió. Sin datos inventados."
+          />
+        </div>
+      </div>
+    );
+  }
+
+  const total =
+    data.contacts.length + data.leads.length + data.demos.length + data.customers.length;
 
   return (
-    <div>
-      <h1 className="font-serif text-3xl">Clientes</h1>
-      <p className="mt-2 text-[var(--muted)]">Cuentas comerciales (no cajeros de mostrador).</p>
-      <div className="mt-8 bg-white/70 p-4">
-        <Table
-          caption="Datos desde commercial-api (stub)."
-          rows={rows.map((row) => ({ id: row.id, name: row.name ?? row.id, status: row.status ?? "—" }))}
-          columns={[
-            { key: "name", header: "Nombre", render: (row) => row.name },
-            { key: "status", header: "Estado", render: (row) => row.status },
-            { key: "id", header: "Id", render: (row) => row.id },
-          ]}
-          empty="Sin datos del API o endpoint admin aún no materializado. El acceso GLOBAL ya fue verificado en servidor."
-        />
+    <div className="space-y-10">
+      <div>
+        <h1 className="font-serif text-3xl">Clientes y solicitudes</h1>
+        <p className="mt-2 text-[var(--muted)]">
+          ContactRequest, Lead, DemoRequest y CommercialCustomer con filtros y cambio de estado real.
+        </p>
       </div>
+
+      <AdminFilterForm
+        action="/admin/clientes"
+        statusOptions={STATUS_OPTIONS}
+        status={status}
+        q={q}
+      />
+
+      {total === 0 ? (
+        <AdminEmptyState
+          title="Sin resultados"
+          detail={
+            status || q
+              ? "Ningún registro coincide con el filtro."
+              : "Aún no hay leads, contactos ni demos en Postgres."
+          }
+        />
+      ) : null}
+
+      <AdminSection title="Contactos">
+        <div className="bg-white/70 p-4">
+          <Table
+            caption="ContactRequest"
+            rows={data.contacts}
+            columns={[
+              { key: "fullName", header: "Nombre", render: (r) => r.fullName },
+              { key: "email", header: "Email", render: (r) => r.email },
+              { key: "status", header: "Estado", render: (r) => r.status },
+              { key: "createdAt", header: "Creado", render: (r) => r.createdAt.slice(0, 10) },
+            ]}
+            empty="Sin solicitudes de contacto."
+          />
+        </div>
+        {data.contacts.length > 0 ? (
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            {data.contacts.slice(0, 8).map((row) => (
+              <AdminActionForm
+                key={row.id}
+                title={`Contacto · ${row.fullName}`}
+                path={`/v1/admin/clientes/contacts/${row.id}`}
+                method="PATCH"
+                token={token}
+                submitLabel="Actualizar estado"
+                fields={[
+                  {
+                    name: "status",
+                    label: "Estado",
+                    type: "select",
+                    defaultValue: row.status,
+                    options: STATUS_OPTIONS,
+                    required: true,
+                  },
+                ]}
+              />
+            ))}
+          </div>
+        ) : null}
+      </AdminSection>
+
+      <AdminSection title="Leads">
+        <div className="bg-white/70 p-4">
+          <Table
+            caption="Lead"
+            rows={data.leads}
+            columns={[
+              { key: "fullName", header: "Nombre", render: (r) => r.fullName },
+              { key: "email", header: "Email", render: (r) => r.email },
+              { key: "status", header: "Estado", render: (r) => r.status },
+              { key: "createdAt", header: "Creado", render: (r) => r.createdAt.slice(0, 10) },
+            ]}
+            empty="Sin leads."
+          />
+        </div>
+        {data.leads.length > 0 ? (
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            {data.leads.slice(0, 8).map((row) => (
+              <div key={row.id} className="space-y-3">
+                <AdminActionForm
+                  title={`Lead · ${row.fullName}`}
+                  path={`/v1/admin/clientes/leads/${row.id}`}
+                  method="PATCH"
+                  token={token}
+                  submitLabel="Actualizar estado"
+                  fields={[
+                    {
+                      name: "status",
+                      label: "Estado",
+                      type: "select",
+                      defaultValue: row.status,
+                      options: STATUS_OPTIONS,
+                      required: true,
+                    },
+                    {
+                      name: "notes",
+                      label: "Notas (opcional)",
+                      type: "textarea",
+                    },
+                  ]}
+                />
+                <AdminActionForm
+                  title="Registrar actividad"
+                  path={`/v1/admin/clientes/leads/${row.id}/activities`}
+                  method="POST"
+                  token={token}
+                  submitLabel="Guardar nota"
+                  fields={[
+                    {
+                      name: "type",
+                      label: "Tipo",
+                      type: "select",
+                      defaultValue: "NOTE",
+                      options: [
+                        { value: "NOTE", label: "NOTE" },
+                        { value: "CALL", label: "CALL" },
+                        { value: "EMAIL", label: "EMAIL" },
+                        { value: "WHATSAPP", label: "WHATSAPP" },
+                        { value: "DEMO", label: "DEMO" },
+                      ],
+                    },
+                    {
+                      name: "body",
+                      label: "Detalle",
+                      type: "textarea",
+                      required: true,
+                    },
+                  ]}
+                />
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </AdminSection>
+
+      <AdminSection title="Demos">
+        <div className="bg-white/70 p-4">
+          <Table
+            caption="DemoRequest"
+            rows={data.demos}
+            columns={[
+              { key: "fullName", header: "Nombre", render: (r) => r.fullName },
+              { key: "email", header: "Email", render: (r) => r.email },
+              { key: "status", header: "Estado", render: (r) => r.status },
+              { key: "createdAt", header: "Creado", render: (r) => r.createdAt.slice(0, 10) },
+            ]}
+            empty="Sin demos."
+          />
+        </div>
+        {data.demos.length > 0 ? (
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            {data.demos.slice(0, 8).map((row) => (
+              <AdminActionForm
+                key={row.id}
+                title={`Demo · ${row.fullName}`}
+                path={`/v1/admin/clientes/demos/${row.id}`}
+                method="PATCH"
+                token={token}
+                submitLabel="Actualizar estado"
+                fields={[
+                  {
+                    name: "status",
+                    label: "Estado",
+                    type: "select",
+                    defaultValue: row.status,
+                    options: STATUS_OPTIONS,
+                    required: true,
+                  },
+                ]}
+              />
+            ))}
+          </div>
+        ) : null}
+      </AdminSection>
+
+      <AdminSection title="Clientes">
+        <div className="bg-white/70 p-4">
+          <Table
+            caption="CommercialCustomer"
+            rows={data.customers}
+            columns={[
+              { key: "fullName", header: "Nombre", render: (r) => r.fullName },
+              { key: "email", header: "Email", render: (r) => r.email },
+              { key: "createdAt", header: "Creado", render: (r) => r.createdAt.slice(0, 10) },
+            ]}
+            empty="Sin clientes."
+          />
+        </div>
+      </AdminSection>
     </div>
   );
 }

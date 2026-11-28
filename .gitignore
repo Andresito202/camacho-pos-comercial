@@ -4,9 +4,38 @@ build
 .env
 .env.local
 *.log
-coverage
+# Test coverage reports only — do NOT ignore apps/*/src/modules/coverage
+/coverage
+**/coverage/
+!apps/**/modules/coverage/
+!apps/**/modules/coverage/**
 .turbo
 .DS_Store
+*.tsbuildinfo
+.next
+apps/web/.next
+apps/web/test-results
 apps/commercial-api/dist
 packages/*/dist
 packages/database/prisma/generated
+apps/web/.env.local
+apps/web/test-results
+apps/web/playwright-report
+apps/web/blob-report
+apps/web/playwright/.cache
+infrastructure/docker/.env
+
+# Environment variants and generated Next.js cache
+.env.*
+!.env.example
+.next/
+
+# Local deployment output and private key containers
+apps/web/out/
+.vercel/
+.cache/
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore

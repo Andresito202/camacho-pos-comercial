@@ -29,11 +29,16 @@ export function Section({
       <div className="mx-auto max-w-6xl">
         <div className="mb-10 max-w-3xl">
           {eyebrow ? (
-            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--teal)]">
+            <p
+              className={cn(
+                "mb-3 text-xs font-semibold uppercase tracking-[0.18em]",
+                tone === "navy" ? "text-[var(--teal-on-dark)]" : "text-[var(--teal)]",
+              )}
+            >
               {eyebrow}
             </p>
           ) : null}
-          <h2 className="font-serif text-3xl leading-tight sm:text-4xl">{title}</h2>
+          <h2 className="text-3xl font-bold leading-tight tracking-tight text-balance sm:text-4xl">{title}</h2>
           {lead ? <p className="mt-4 text-lg text-[color-mix(in_srgb,currentColor_72%,transparent)]">{lead}</p> : null}
         </div>
         {children}

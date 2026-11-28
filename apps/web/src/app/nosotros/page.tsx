@@ -4,7 +4,7 @@ import { buildMetadata } from "@/lib/seo";
 
 export const metadata = buildMetadata({
   title: "Nosotros",
-  description: "Camacho POS Colombia: software local-first y kits para el comercio colombiano.",
+  description: "Camacho POS Colombia: software POS y kits para el comercio colombiano.",
   path: "/nosotros",
 });
 
@@ -16,18 +16,19 @@ export default function NosotrosPage() {
           <Image src="/brand/logo-yellow.png" alt="Camacho POS Colombia" width={280} height={100} className="h-16 w-auto" />
           <h1 className="font-serif text-4xl sm:text-5xl">Contabilidad y precisión siempre.</h1>
           <p className="text-lg text-white/75">
-            Construimos un POS para el mostrador real: cortes de Internet, roles estrictos, facturación por adapters y hardware por kit.
-            La web comercial vende y contrata; la caja vive en Electron y Android.
+            Construimos un POS para el mostrador real: cortes de Internet, roles claros, facturación electrónica cuando
+            el servicio esté disponible, y hardware por kit. La web comercial vende y contrata; la caja vive en la
+            aplicación instalada.
           </p>
         </div>
       </section>
-      <Section title="Principios" lead="No negociamos seguridad fail-closed ni last-write-wins genérico.">
+      <Section title="Principios" lead="Operamos con transparencia comercial y seguridad sin atajos.">
         <ul className="grid gap-4 md:grid-cols-2">
           {[
-            "Local-first: la venta ordinaria no depende de Internet.",
-            "Un ID de cliente no otorga autoridad de tenant.",
-            "Hechos financieros e inventario append-only cuando el contrato lo exige.",
-            "Estados de capacidad honestos: Disponible / En certificación / Próximamente / No publicada.",
+            "La venta ordinaria no depende de Internet.",
+            "Cada negocio opera con su propio contexto autorizado.",
+            "La historia de ventas e inventario se conserva cuando el contrato lo exige.",
+            "Estados de capacidad honestos: Disponible / En certificación / Próximamente / Pendiente de publicación.",
           ].map((item) => (
             <li key={item} className="border-l-4 border-[var(--yellow)] bg-white/70 pl-4 py-3">{item}</li>
           ))}

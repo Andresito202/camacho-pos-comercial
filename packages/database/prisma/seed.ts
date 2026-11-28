@@ -2,10 +2,25 @@
  * Provisional DRAFT commercial catalog seed.
  * Prices are DRAFT — real charges disabled until approved.
  * WhatsApp number is a DEV PLACEHOLDER.
+ * Promotion windows use America/Bogota (UTC-5) relative to "now".
  */
-import { PrismaClient, PublicationStatus, FeatureCommercialStatus, BillingInterval, ProductKind, LegalDocumentType } from "@prisma/client";
+import { PrismaClient, PublicationStatus, FeatureCommercialStatus, BillingInterval, ProductKind, LegalDocumentType, CouponType } from "@prisma/client";
 
 const prisma = new PrismaClient();
+
+/** America/Bogota local wall-clock → UTC Date (fixed UTC-5, no DST). */
+function bogotaLocalDate(daysFromToday: number, hour = 0, minute = 0, second = 0): Date {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Bogota",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const y = Number(parts.find((p) => p.type === "year")?.value);
+  const m = Number(parts.find((p) => p.type === "month")?.value);
+  const d = Number(parts.find((p) => p.type === "day")?.value);
+  return new Date(Date.UTC(y, m - 1, d + daysFromToday, hour + 5, minute, second));
+}
 
 /** Major Colombian cities — DIVIPOLA subset. */
 const DIVIPOLA: Array<{ deptId: string; deptName: string; cities: Array<{ id: string; name: string }> }> = [
@@ -55,83 +70,87 @@ const FEATURE_MATRIX: Array<{
   status: FeatureCommercialStatus;
   claimNote: string;
   plans: string[];
+  /** When true, omit from public plan bullet lists (still available for admin/docs via claimNote). */
+  hideFromPublicBullets?: boolean;
 }> = [
   {
     code: "local_first_sales",
-    label: "Ventas local-first",
-    description: "Venta ordinaria autorizada sin depender de Internet",
+    label: "Vende incluso cuando se interrumpe internet",
+    description: "Tu punto de venta sigue atendiendo clientes aunque falle la conexión",
     status: FeatureCommercialStatus.AVAILABLE,
-    claimNote: "AVAILABLE as commercial claim only where verified from POS runtime evidence; not a blanket production certification.",
+    claimNote: "AVAILABLE as commercial claim only where verified from POS runtime evidence; not a blanket production certification. Continuity of local sales.",
     plans: ["esencial", "profesional", "empresarial", "perpetua"],
   },
   {
     code: "sqlite_single_writer",
-    label: "SQLite single-writer",
-    description: "POS Local Service como único writer SQLite/WAL",
+    label: "Tu caja sigue operando en el local",
+    description: "La operación de mostrador no se detiene por un corte breve de red",
     status: FeatureCommercialStatus.AVAILABLE,
-    claimNote: "Claim limited to architectures already implemented in POS; commercial portal does not re-verify.",
+    claimNote: "Claim limited to local POS runtime architecture already implemented; commercial portal does not re-verify. Hidden from public bullets — merged into merchant continuity messaging.",
     plans: ["esencial", "profesional", "empresarial", "perpetua"],
+    hideFromPublicBullets: true,
   },
   {
     code: "multi_caja",
-    label: "Multi-caja",
-    description: "Más de una caja por sucursal (1 licencia = 1 caja)",
+    label: "Varias cajas en tu negocio",
+    description: "Crece con más puntos de venta (1 licencia = 1 caja)",
     status: FeatureCommercialStatus.AVAILABLE,
     claimNote: "Licensing rule: one license equals one caja unless a signed contract says otherwise.",
     plans: ["profesional", "empresarial", "perpetua"],
   },
   {
     code: "inventory",
-    label: "Inventario",
-    description: "Movimientos append-only de inventario",
+    label: "Control de inventario",
+    description: "Registra entradas, salidas y existencias de tu mercancía",
     status: FeatureCommercialStatus.AVAILABLE,
-    claimNote: "Status reflects POS domain capability documentation; portal sale does not prove deployment.",
+    claimNote: "Status reflects POS domain capability documentation; portal sale does not prove deployment. Technical: append-only inventory movements.",
     plans: ["esencial", "profesional", "empresarial", "perpetua"],
   },
   {
     code: "central_sync",
-    label: "Central Sync",
-    description: "Sincronización outbox/inbox con backend central",
+    label: "Sincroniza información cuando recuperes la conexión",
+    description: "Los datos del local se actualizan con la nube al volver internet",
     status: FeatureCommercialStatus.IN_CERTIFICATION,
-    claimNote: "Persistence gate exists on POS line; commercial claim stays IN_CERTIFICATION until portal E2E evidence.",
+    claimNote: "Persistence/sync gate exists on POS line; commercial claim stays IN_CERTIFICATION until portal E2E evidence.",
     plans: ["profesional", "empresarial", "perpetua"],
   },
   {
     code: "factus_electronic_invoice",
-    label: "Facturación electrónica FACTUS",
-    description: "Emisión electrónica vía adapter FACTUS",
+    label: "Emite facturas electrónicas cuando el servicio esté contratado y disponible",
+    description: "Facturación electrónica según el servicio contratado y su disponibilidad",
     status: FeatureCommercialStatus.IN_CERTIFICATION,
-    claimNote: "Adapter path exists in POS; commercial portal sales of FACTUS remain IN_CERTIFICATION.",
+    claimNote: "Adapter path exists in POS (FACTUS); commercial portal sales of electronic invoicing remain IN_CERTIFICATION.",
     plans: ["profesional", "empresarial", "perpetua"],
   },
   {
     code: "factus_pay",
-    label: "FACTUS Pay",
-    description: "Cobros QR / colecciones FACTUS Pay",
+    label: "Recaudos electrónicos (cuando esté disponible)",
+    description: "Cobros electrónicos del portal cuando el servicio esté certificado",
     status: FeatureCommercialStatus.IN_CERTIFICATION,
-    claimNote: "FACTUS Pay for commercial portal sales is IN_CERTIFICATION. Sandbox mock only until credentials + approval.",
+    claimNote: "FACTUS Pay for commercial portal sales is IN_CERTIFICATION. Sandbox mock only until credentials + approval. Kept out of public plan bullets.",
     plans: ["profesional", "empresarial", "perpetua"],
+    hideFromPublicBullets: true,
   },
   {
     code: "reporting",
-    label: "Reportes",
-    description: "Reportes operativos por sucursal",
+    label: "Reportes de tu operación",
+    description: "Consulta ventas e indicadores por sucursal cuando esté disponible",
     status: FeatureCommercialStatus.COMING_SOON,
     claimNote: "Not claimed as commercially available until product evidence exists.",
     plans: ["empresarial", "perpetua"],
   },
   {
     code: "multi_branch",
-    label: "Multi-sucursal",
-    description: "Operación multi-sucursal con ownership por contexto",
+    label: "Varias sucursales",
+    description: "Opera más de una sede con control por negocio",
     status: FeatureCommercialStatus.COMING_SOON,
     claimNote: "Commercial matrix marks COMING_SOON pending verified packaging.",
     plans: ["empresarial", "perpetua"],
   },
   {
     code: "android_companion",
-    label: "Companion Android",
-    description: "App companion Android",
+    label: "App móvil companion (cuando esté disponible)",
+    description: "Aplicación móvil de apoyo para el mostrador",
     status: FeatureCommercialStatus.UNPUBLISHED,
     claimNote: "Unpublished until product decision and evidence.",
     plans: ["empresarial", "perpetua"],
@@ -181,35 +200,39 @@ async function seedPlans() {
     {
       slug: "esencial",
       name: "Esencial",
-      tagline: "Caja local-first para un punto de venta",
-      description: "Plan base: una licencia = una caja. Precios provisionales DRAFT.",
+      tagline: "Para un punto de venta que necesita vender sin depender de internet",
+      description:
+        "Ideal para tiendas y panaderías que arrancan. Una licencia = una caja. Precio de referencia pendiente de publicación comercial.",
       sortOrder: 1,
-      monthly: 49900,
-      annual: 499000,
+      monthly: 29900,
+      annual: 299000,
     },
     {
       slug: "profesional",
       name: "Profesional",
-      tagline: "Operación con sync y pagos en certificación",
-      description: "Incluye capacidades en certificación (Central Sync, FACTUS). Precios provisionales DRAFT.",
+      tagline: "Para comercios que crecen con varias cajas y sincronización",
+      description:
+        "Incluye sincronización al recuperar conexión y facturación electrónica cuando el servicio esté contratado y disponible. Precio de referencia pendiente de publicación.",
       sortOrder: 2,
-      monthly: 79900,
-      annual: 799000,
+      monthly: 49900,
+      annual: 499000,
     },
     {
       slug: "empresarial",
       name: "Empresarial",
-      tagline: "Multi-caja y expansión",
-      description: "Para operaciones con más cajas y roadmap multi-sucursal. Precios provisionales DRAFT.",
+      tagline: "Para operaciones con más cajas y expansión a sucursales",
+      description:
+        "Pensado para redes en crecimiento. Reportes y multi-sucursal según disponibilidad publicada. Precio de referencia pendiente de publicación.",
       sortOrder: 3,
-      monthly: 119900,
-      annual: 1199000,
+      monthly: 89900,
+      annual: 899000,
     },
     {
       slug: "perpetua",
       name: "Perpetua",
-      tagline: "Licencia perpetua (pago único)",
-      description: "Oferta perpetua provisional. Una licencia = una caja. Precio DRAFT.",
+      tagline: "Licencia de pago único para una caja",
+      description:
+        "Oferta de licencia perpetua (pago único). Una licencia = una caja. Precio de referencia pendiente de publicación.",
       sortOrder: 4,
       monthly: null as number | null,
       annual: null as number | null,
@@ -233,7 +256,6 @@ async function seedPlans() {
         name: p.name,
         tagline: p.tagline,
         description: p.description,
-        publicationStatus: PublicationStatus.DRAFT,
       },
     });
 
@@ -256,13 +278,37 @@ async function seedPlans() {
         maxCajas: 1,
         publicationStatus: PublicationStatus.DRAFT,
       },
-      update: { name: `${p.name} — 1 caja`, publicationStatus: PublicationStatus.DRAFT },
+      update: { name: `${p.name} — 1 caja` },
     });
   }
 
   for (const feature of FEATURE_MATRIX) {
     for (const planSlug of feature.plans) {
       const plan = await prisma.plan.findUniqueOrThrow({ where: { slug: planSlug } });
+      // Public bullets omit architecture/pay features flagged hideFromPublicBullets;
+      // claimNote remains technical for admin/docs. Labels stay merchant-facing.
+      if (feature.hideFromPublicBullets) {
+        await prisma.planFeature.upsert({
+          where: { planId_code: { planId: plan.id, code: feature.code } },
+          create: {
+            planId: plan.id,
+            code: feature.code,
+            label: feature.label,
+            description: feature.description,
+            commercialStatus: feature.status,
+            claimNote: feature.claimNote,
+            sortOrder: 100,
+          },
+          update: {
+            label: feature.label,
+            description: feature.description,
+            commercialStatus: feature.status,
+            claimNote: feature.claimNote,
+            sortOrder: 100,
+          },
+        });
+        continue;
+      }
       await prisma.planFeature.upsert({
         where: { planId_code: { planId: plan.id, code: feature.code } },
         create: {
@@ -286,26 +332,10 @@ async function seedPlans() {
 
 async function upsertPlanPrice(planId: string, interval: BillingInterval, amountCents: number) {
   const existing = await prisma.planPrice.findFirst({
-    where: { planId, billingInterval: interval, version: 1 },
+    where: { planId, billingInterval: interval },
+    select: { id: true },
   });
-  if (existing) {
-    await prisma.planPrice.update({
-      where: { id: existing.id },
-      data: {
-        amountCents,
-        publicationStatus: PublicationStatus.DRAFT,
-      },
-    });
-    await prisma.planPriceHistory.create({
-      data: {
-        planPriceId: existing.id,
-        amountCents,
-        reason: "seed-refresh",
-        changedBy: "seed",
-      },
-    });
-    return;
-  }
+  if (existing) return;
   const price = await prisma.planPrice.create({
     data: {
       planId,
@@ -331,10 +361,13 @@ async function seedKits() {
     create: {
       slug: "kits-pos",
       name: "Kits POS",
-      description: "Kits de hardware + licencia (precios DRAFT)",
+      description: "Kits de equipos + licencia para arrancar tu caja",
       publicationStatus: PublicationStatus.DRAFT,
     },
-    update: { publicationStatus: PublicationStatus.DRAFT },
+    update: {
+      description: "Kits de equipos + licencia para arrancar tu caja",
+      publicationStatus: PublicationStatus.DRAFT,
+    },
   });
 
   const kits = [
@@ -350,13 +383,14 @@ async function seedKits() {
         slug: k.slug,
         sku: k.sku,
         name: k.name,
-        description: `${k.name} — precio provisional DRAFT. No cobrable hasta aprobación.`,
+        description: `${k.name}: equipos de referencia + 1 licencia. Precio de referencia pendiente de publicación comercial.`,
         kind: ProductKind.KIT,
         categoryId: category.id,
         publicationStatus: PublicationStatus.DRAFT,
       },
       update: {
         name: k.name,
+        description: `${k.name}: equipos de referencia + 1 licencia. Precio de referencia pendiente de publicación comercial.`,
         publicationStatus: PublicationStatus.DRAFT,
         categoryId: category.id,
       },
@@ -408,41 +442,412 @@ async function seedKits() {
     });
   }
 
-  // Standalone hardware sample (DRAFT)
-  const hwCat = await prisma.productCategory.upsert({
+  // Hardware categories + products (DRAFT). Images are SVG illustrations — not real model photos.
+  const categories: Array<{ slug: string; name: string; description: string }> = [
+    { slug: "impresoras-termicas", name: "Impresoras térmicas", description: "Impresión de tickets 58/80mm" },
+    { slug: "cajones", name: "Cajones", description: "Cajones monederos para POS" },
+    { slug: "lectores", name: "Lectores", description: "Lectores de código de barras" },
+    { slug: "balanzas", name: "Balanzas", description: "Balanzas comerciales" },
+    { slug: "terminales-windows", name: "Terminales Windows", description: "PCs / all-in-one para caja en Windows" },
+    { slug: "terminales-android", name: "Terminales Android", description: "Tablets / terminales Android" },
+    { slug: "accesorios", name: "Accesorios", description: "Cables, soportes y consumibles" },
+    { slug: "kits-pos", name: "Kits POS", description: "Kits de hardware + licencia" },
+  ];
+
+  const categoryIds = new Map<string, string>();
+  for (const [index, cat] of categories.entries()) {
+    const row = await prisma.productCategory.upsert({
+      where: { slug: cat.slug },
+      create: {
+        slug: cat.slug,
+        name: cat.name,
+        description: cat.description,
+        sortOrder: index + 1,
+        publicationStatus: PublicationStatus.DRAFT,
+      },
+      update: {
+        name: cat.name,
+        description: cat.description,
+        publicationStatus: PublicationStatus.DRAFT,
+      },
+    });
+    categoryIds.set(cat.slug, row.id);
+  }
+
+  // Keep legacy "hardware" slug pointing at impresoras for older links
+  await prisma.productCategory.upsert({
     where: { slug: "hardware" },
     create: {
       slug: "hardware",
-      name: "Hardware",
-      publicationStatus: PublicationStatus.DRAFT,
+      name: "Hardware (legacy)",
+      publicationStatus: PublicationStatus.ARCHIVED,
     },
-    update: {},
+    update: { publicationStatus: PublicationStatus.ARCHIVED },
   });
-  const printer = await prisma.product.upsert({
-    where: { slug: "impresora-termica-80mm" },
-    create: {
+
+  type HwSeed = {
+    slug: string;
+    sku: string;
+    name: string;
+    category: string;
+    amount: number;
+    image: string;
+    kind: ProductKind;
+    description: string;
+    stock: number;
+  };
+
+  const hardware: HwSeed[] = [
+    {
       slug: "impresora-termica-80mm",
       sku: "HW-PRINT-80",
       name: "Impresora térmica 80mm",
-      description: "Referencia de catálogo DRAFT — precio no cobrable.",
+      category: "impresoras-termicas",
+      amount: 350000,
+      image: "/images/hardware/impresora-termica.svg",
       kind: ProductKind.HARDWARE,
-      categoryId: hwCat.id,
-      publicationStatus: PublicationStatus.DRAFT,
-      variants: {
-        create: {
-          sku: "HW-PRINT-80-STD",
-          name: "Estándar",
-          amountCents: 350000,
-          version: 1,
-          publicationStatus: PublicationStatus.DRAFT,
-          stock: { create: { quantityOnHand: 0 } },
-          history: { create: { amountCents: 350000, reason: "initial-seed", changedBy: "seed" } },
+      description: "Ilustración referencial de impresora térmica 80 mm. El modelo exacto se confirma al contratar.",
+      stock: 12,
+    },
+    {
+      slug: "impresora-termica-58mm",
+      sku: "HW-PRINT-58",
+      name: "Impresora térmica 58mm",
+      category: "impresoras-termicas",
+      amount: 220000,
+      image: "/images/hardware/impresora-termica.svg",
+      kind: ProductKind.HARDWARE,
+      description: "Ilustración referencial de impresora térmica 58 mm. El modelo exacto se confirma al contratar.",
+      stock: 20,
+    },
+    {
+      slug: "cajon-monedero-rj11",
+      sku: "HW-CASH-RJ11",
+      name: "Cajón monedero RJ11",
+      category: "cajones",
+      amount: 180000,
+      image: "/images/hardware/cajon-monedero.svg",
+      kind: ProductKind.HARDWARE,
+      description: "Ilustración referencial de cajón monedero. Compatible con kits de caja Camacho POS.",
+      stock: 15,
+    },
+    {
+      slug: "lector-barras-usb",
+      sku: "HW-SCAN-USB",
+      name: "Lector de barras USB",
+      category: "lectores",
+      amount: 95000,
+      image: "/images/hardware/lector-barras.svg",
+      kind: ProductKind.HARDWARE,
+      description: "Ilustración referencial de lector USB. Ideal para mostrador y recepción.",
+      stock: 30,
+    },
+    {
+      slug: "lector-barras-inalambrico",
+      sku: "HW-SCAN-BT",
+      name: "Lector de barras inalámbrico",
+      category: "lectores",
+      amount: 210000,
+      image: "/images/hardware/lector-barras.svg",
+      kind: ProductKind.HARDWARE,
+      description: "Ilustración referencial de lector inalámbrico para movilidad en el local.",
+      stock: 10,
+    },
+    {
+      slug: "balanza-comercial",
+      sku: "HW-SCALE-STD",
+      name: "Balanza comercial",
+      category: "balanzas",
+      amount: 420000,
+      image: "/images/hardware/balanza.svg",
+      kind: ProductKind.HARDWARE,
+      description: "Ilustración referencial de balanza comercial. Disponibilidad según sector y certificación.",
+      stock: 8,
+    },
+    {
+      slug: "terminal-windows-aio",
+      sku: "HW-WIN-AIO",
+      name: "Terminal Windows all-in-one",
+      category: "terminales-windows",
+      amount: 1890000,
+      image: "/images/hardware/terminal-tactil.svg",
+      kind: ProductKind.HARDWARE,
+      description: "Ilustración referencial de terminal all-in-one para caja en Windows.",
+      stock: 5,
+    },
+    {
+      slug: "terminal-windows-mini-pc",
+      sku: "HW-WIN-MINI",
+      name: "Mini PC Windows + monitor",
+      category: "terminales-windows",
+      amount: 1450000,
+      image: "/images/hardware/terminal-tactil.svg",
+      kind: ProductKind.HARDWARE,
+      description: "Ilustración referencial de mini PC Windows con monitor para mostrador.",
+      stock: 7,
+    },
+    {
+      slug: "terminal-android-tablet",
+      sku: "HW-AND-TAB",
+      name: "Terminal Android tablet",
+      category: "terminales-android",
+      amount: 980000,
+      image: "/images/hardware/terminal-tactil.svg",
+      kind: ProductKind.HARDWARE,
+      description: "Ilustración referencial de tablet Android para operación de caja.",
+      stock: 9,
+    },
+    {
+      slug: "soporte-tablet-mostrador",
+      sku: "HW-ACC-STAND",
+      name: "Soporte de tablet para mostrador",
+      category: "accesorios",
+      amount: 75000,
+      image: "/images/hardware/terminal-tactil.svg",
+      kind: ProductKind.ACCESSORY,
+      description: "Ilustración referencial de soporte para tablet en mostrador.",
+      stock: 25,
+    },
+    {
+      slug: "rollo-termico-80mm",
+      sku: "HW-ACC-ROLL80",
+      name: "Rollo térmico 80mm (caja x50)",
+      category: "accesorios",
+      amount: 65000,
+      image: "/images/hardware/impresora-termica.svg",
+      kind: ProductKind.ACCESSORY,
+      description: "Consumible de referencia: rollos térmicos 80 mm (caja x50).",
+      stock: 40,
+    },
+  ];
+
+  for (const [index, hw] of hardware.entries()) {
+    const categoryId = categoryIds.get(hw.category)!;
+    const product = await prisma.product.upsert({
+      where: { slug: hw.slug },
+      create: {
+        slug: hw.slug,
+        sku: hw.sku,
+        name: hw.name,
+        description: hw.description,
+        kind: hw.kind,
+        categoryId,
+        sortOrder: index + 1,
+        publicationStatus: PublicationStatus.DRAFT,
+        images: {
+          create: {
+            url: hw.image,
+            alt: `${hw.name} — ilustración SVG (no foto de modelo real)`,
+            sortOrder: 0,
+          },
+        },
+        variants: {
+          create: {
+            sku: `${hw.sku}-STD`,
+            name: "Estándar",
+            amountCents: hw.amount,
+            version: 1,
+            publicationStatus: PublicationStatus.DRAFT,
+            stock: { create: { quantityOnHand: hw.stock, trackInventory: true } },
+            history: { create: { amountCents: hw.amount, reason: "initial-seed", changedBy: "seed" } },
+          },
         },
       },
+      update: {
+        name: hw.name,
+        description: hw.description,
+        categoryId,
+        publicationStatus: PublicationStatus.DRAFT,
+        sortOrder: index + 1,
+      },
+    });
+
+    const variantSku = `${hw.sku}-STD`;
+    const variant = await prisma.productVariant.upsert({
+      where: { sku: variantSku },
+      create: {
+        productId: product.id,
+        sku: variantSku,
+        name: "Estándar",
+        amountCents: hw.amount,
+        version: 1,
+        publicationStatus: PublicationStatus.DRAFT,
+        stock: { create: { quantityOnHand: hw.stock, trackInventory: true } },
+        history: { create: { amountCents: hw.amount, reason: "initial-seed", changedBy: "seed" } },
+      },
+      update: {
+        amountCents: hw.amount,
+        publicationStatus: PublicationStatus.DRAFT,
+        productId: product.id,
+      },
+    });
+
+    await prisma.productStock.upsert({
+      where: { productVariantId: variant.id },
+      create: {
+        productVariantId: variant.id,
+        quantityOnHand: hw.stock,
+        trackInventory: true,
+      },
+      update: { quantityOnHand: hw.stock },
+    });
+
+    const existingImage = await prisma.productImage.findFirst({
+      where: { productId: product.id, url: hw.image },
+    });
+    if (!existingImage) {
+      await prisma.productImage.create({
+        data: {
+          productId: product.id,
+          url: hw.image,
+          alt: `${hw.name} — ilustración SVG (no foto de modelo real)`,
+          sortOrder: 0,
+        },
+      });
+    }
+  }
+
+  // Attach SVG illustrations to kits
+  for (const k of kits) {
+    const product = await prisma.product.findUnique({ where: { slug: k.slug } });
+    if (!product) continue;
+    const img = await prisma.productImage.findFirst({
+      where: { productId: product.id, url: "/images/hardware/terminal-tactil.svg" },
+    });
+    if (!img) {
+      await prisma.productImage.create({
+        data: {
+          productId: product.id,
+          url: "/images/hardware/terminal-tactil.svg",
+          alt: `${k.name} — ilustración SVG (no foto de modelo real)`,
+          sortOrder: 0,
+        },
+      });
+    }
+  }
+}
+
+async function seedPromotions() {
+  // Relative to America/Bogota "today" so some are active in staging right now.
+  const promos: Array<{
+    code: string;
+    name: string;
+    description: string;
+    startDays: number;
+    endDays: number;
+    status: PublicationStatus;
+    coupon?: {
+      code: string;
+      type: CouponType;
+      percentOff?: number;
+      amountOffCents?: number;
+    };
+  }> = [
+    {
+      code: "BLACK-FRIDAY",
+      name: "Black Friday",
+      description: "Descuentos especiales de temporada en planes y kits seleccionados.",
+      startDays: -3,
+      endDays: 4,
+      status: PublicationStatus.DRAFT,
+      coupon: { code: "BF15", type: CouponType.PERCENT, percentOff: 15 },
     },
-    update: { publicationStatus: PublicationStatus.DRAFT },
-  });
-  void printer;
+    {
+      code: "CYBER-MONDAY",
+      name: "Cyber Monday",
+      description: "Promoción de inicio de semana en software y equipos.",
+      startDays: -1,
+      endDays: 2,
+      status: PublicationStatus.DRAFT,
+      coupon: { code: "CYBER10", type: CouponType.PERCENT, percentOff: 10 },
+    },
+    {
+      code: "LANZAMIENTO",
+      name: "Lanzamiento portal",
+      description: "Beneficio de lanzamiento al contratar tu primer plan Camacho POS.",
+      startDays: -14,
+      endDays: 45,
+      status: PublicationStatus.DRAFT,
+      coupon: { code: "LANZA5", type: CouponType.PERCENT, percentOff: 5 },
+    },
+    {
+      code: "ANUAL",
+      name: "Descuento plan anual",
+      description: "Ahorra al contratar el plan con pago anual.",
+      startDays: -7,
+      endDays: 60,
+      status: PublicationStatus.DRAFT,
+      coupon: { code: "ANUAL8", type: CouponType.PERCENT, percentOff: 8 },
+    },
+    {
+      code: "KIT-DISCOUNT",
+      name: "Descuento en kits",
+      description: "Descuento especial sobre kits de equipos seleccionados.",
+      startDays: -2,
+      endDays: 30,
+      status: PublicationStatus.DRAFT,
+      coupon: { code: "KIT50K", type: CouponType.FIXED_AMOUNT, amountOffCents: 50000 },
+    },
+    {
+      code: "FUTURE-SAMPLE",
+      name: "Campaña programada",
+      description: "Próxima campaña comercial — aún no vigente.",
+      startDays: 30,
+      endDays: 60,
+      status: PublicationStatus.DRAFT,
+      coupon: { code: "FUTURE20", type: CouponType.PERCENT, percentOff: 20 },
+    },
+  ];
+
+  for (const promo of promos) {
+    const startsAt = bogotaLocalDate(promo.startDays, 0, 0, 0);
+    const endsAt = bogotaLocalDate(promo.endDays, 23, 59, 59);
+    const row = await prisma.promotion.upsert({
+      where: { code: promo.code },
+      create: {
+        code: promo.code,
+        name: promo.name,
+        description: promo.description,
+        publicationStatus: promo.status,
+        startsAt,
+        endsAt,
+      },
+      update: {
+        name: promo.name,
+        description: promo.description,
+        publicationStatus: promo.status,
+        startsAt,
+        endsAt,
+        deletedAt: null,
+      },
+    });
+
+    if (promo.coupon) {
+      await prisma.coupon.upsert({
+        where: { code: promo.coupon.code },
+        create: {
+          code: promo.coupon.code,
+          type: promo.coupon.type,
+          percentOff: promo.coupon.percentOff ?? null,
+          amountOffCents: promo.coupon.amountOffCents ?? null,
+          active: true,
+          startsAt,
+          endsAt,
+          promotionId: row.id,
+        },
+        update: {
+          type: promo.coupon.type,
+          percentOff: promo.coupon.percentOff ?? null,
+          amountOffCents: promo.coupon.amountOffCents ?? null,
+          active: true,
+          startsAt,
+          endsAt,
+          promotionId: row.id,
+          deletedAt: null,
+        },
+      });
+    }
+  }
 }
 
 async function seedContent() {
@@ -458,6 +863,9 @@ async function seedContent() {
       whatsappNumber: "573000000000_DEV_PLACEHOLDER",
       supportEmail: "soporte@camachoposcolombia.com",
       logoUrl: "/brand/logo-stacked.png",
+      promoBannerMessage: "Kit de apertura con instalación remota incluida este mes.",
+      promoBannerHref: "/promociones",
+      promoBannerCta: "Ver promoción",
       publicationStatus: PublicationStatus.DRAFT,
     },
     update: {
@@ -467,72 +875,91 @@ async function seedContent() {
       secondaryColor: "#F5C518",
       accentColor: "#1A5C45",
       whatsappNumber: "573000000000_DEV_PLACEHOLDER",
+      promoBannerMessage: "Kit de apertura con instalación remota incluida este mes.",
+      promoBannerHref: "/promociones",
+      promoBannerCta: "Ver promoción",
       publicationStatus: PublicationStatus.DRAFT,
     },
   });
 
-  await prisma.socialLink.upsert({
-    where: { platform_url: { platform: "whatsapp", url: "https://wa.me/573000000000" } },
-    create: {
-      platform: "whatsapp",
-      url: "https://wa.me/573000000000",
-      sortOrder: 1,
-      publicationStatus: PublicationStatus.DRAFT,
-    },
-    update: { publicationStatus: PublicationStatus.DRAFT },
-  });
+  const socials = [
+    { platform: "facebook", url: "https://www.facebook.com/camachoposcolombia", sortOrder: 1 },
+    { platform: "instagram", url: "https://www.instagram.com/camachoposcolombia", sortOrder: 2 },
+    { platform: "youtube", url: "https://www.youtube.com/@camachoposcolombia", sortOrder: 3 },
+    { platform: "linkedin", url: "https://www.linkedin.com/company/camacho-pos-colombia", sortOrder: 4 },
+  ];
+  for (const social of socials) {
+    await prisma.socialLink.upsert({
+      where: { platform_url: { platform: social.platform, url: social.url } },
+      create: {
+        ...social,
+        publicationStatus: PublicationStatus.PUBLISHED,
+      },
+      update: { publicationStatus: PublicationStatus.PUBLISHED, sortOrder: social.sortOrder },
+    });
+  }
 
   await prisma.faq.upsert({
     where: { slug: "que-incluye-una-licencia" },
     create: {
       slug: "que-incluye-una-licencia",
       question: "¿Qué incluye una licencia?",
-      answer: "Una licencia corresponde a una caja (punto de venta), salvo que un contrato firmado indique otra cosa. Los precios publicados en borrador no autorizan cobro real.",
+      answer:
+        "Una licencia corresponde a una caja (punto de venta), salvo que un contrato firmado indique otra cosa. Los precios de referencia pendientes de publicación no autorizan cobro real.",
       category: "licencias",
       publicationStatus: PublicationStatus.DRAFT,
     },
-    update: { publicationStatus: PublicationStatus.DRAFT },
+    update: {
+      answer:
+        "Una licencia corresponde a una caja (punto de venta), salvo que un contrato firmado indique otra cosa. Los precios de referencia pendientes de publicación no autorizan cobro real.",
+      publicationStatus: PublicationStatus.DRAFT,
+    },
   });
 
   await prisma.blogPost.upsert({
     where: { slug: "bienvenida-camacho-pos" },
     create: {
       slug: "bienvenida-camacho-pos",
-      title: "Camacho POS Colombia — portal comercial (borrador)",
-      excerpt: "Contenido provisional DRAFT.",
-      body: "Este artículo es un marcador DRAFT del portal comercial. No constituye oferta vinculante.",
+      title: "Camacho POS Colombia — bienvenida al portal comercial",
+      excerpt: "Contenido de referencia del portal comercial.",
+      body: "Este artículo presenta el portal comercial de Camacho POS Colombia. No constituye oferta vinculante hasta publicación aprobada.",
       publicationStatus: PublicationStatus.DRAFT,
     },
-    update: { publicationStatus: PublicationStatus.DRAFT },
+    update: {
+      title: "Camacho POS Colombia — bienvenida al portal comercial",
+      excerpt: "Contenido de referencia del portal comercial.",
+      body: "Este artículo presenta el portal comercial de Camacho POS Colombia. No constituye oferta vinculante hasta publicación aprobada.",
+      publicationStatus: PublicationStatus.DRAFT,
+    },
   });
 
   const legal = [
     {
       type: LegalDocumentType.TERMS,
       slug: "terminos-condiciones",
-      title: "Términos y condiciones (borrador)",
-      body: "DOCUMENTO LEGAL EN ESTADO DRAFT. No constituye términos vinculantes hasta publicación aprobada.",
+      title: "Términos y condiciones (pendiente de publicación)",
+      body: "DOCUMENTO LEGAL PENDIENTE DE PUBLICACIÓN. No constituye términos vinculantes hasta aprobación.",
       version: "0.1.0-draft",
     },
     {
       type: LegalDocumentType.PRIVACY,
       slug: "politica-privacidad",
-      title: "Política de privacidad (borrador)",
-      body: "DOCUMENTO LEGAL EN ESTADO DRAFT. Tratamiento de datos pendiente de aprobación jurídica.",
+      title: "Política de privacidad (pendiente de publicación)",
+      body: "DOCUMENTO LEGAL PENDIENTE DE PUBLICACIÓN. Tratamiento de datos pendiente de aprobación jurídica.",
       version: "0.1.0-draft",
     },
     {
       type: LegalDocumentType.COOKIES,
       slug: "politica-cookies",
-      title: "Política de cookies (borrador)",
-      body: "DOCUMENTO LEGAL EN ESTADO DRAFT.",
+      title: "Política de cookies (pendiente de publicación)",
+      body: "DOCUMENTO LEGAL PENDIENTE DE PUBLICACIÓN.",
       version: "0.1.0-draft",
     },
     {
       type: LegalDocumentType.LICENSE,
       slug: "contrato-licencia",
-      title: "Contrato de licencia de software (borrador)",
-      body: "DOCUMENTO LEGAL EN ESTADO DRAFT. Una licencia = una caja salvo pacto en contrario.",
+      title: "Contrato de licencia de software (pendiente de publicación)",
+      body: "DOCUMENTO LEGAL PENDIENTE DE PUBLICACIÓN. Una licencia = una caja salvo pacto en contrario.",
       version: "0.1.0-draft",
     },
   ];
@@ -558,12 +985,15 @@ async function seedContent() {
     create: {
       path: "/",
       title: "Camacho POS Colombia",
-      description: "Punto de venta local-first para Colombia. Precios y contenidos en borrador.",
+      description:
+        "Software POS y kits para el comercio colombiano. Vende aunque se interrumpa internet. Precios de referencia pendientes de publicación.",
       canonicalUrl: "https://camachoposcolombia.com/",
       robots: "noindex,nofollow",
     },
     update: {
       title: "Camacho POS Colombia",
+      description:
+        "Software POS y kits para el comercio colombiano. Vende aunque se interrumpa internet. Precios de referencia pendientes de publicación.",
       robots: "noindex,nofollow",
     },
   });
@@ -604,6 +1034,7 @@ async function main() {
   await seedGeo();
   await seedPlans();
   await seedKits();
+  await seedPromotions();
   await seedContent();
   console.log("Seed complete. All catalog prices remain DRAFT. WhatsApp is DEV PLACEHOLDER.");
 }

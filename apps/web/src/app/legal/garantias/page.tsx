@@ -7,7 +7,7 @@ export const metadata = buildMetadata({
 });
 
 export default function LegalPage() {
-  const paragraphs = ["El software incluye actualizaciones de seguridad según el plan vigente.", "El hardware se garantiza según el proveedor homologado y la factura del kit; plazos se confirman en la orden.", "Defectos de instalación atribuibles al canal comercial se atienden sin costo de visita remota inicial."] as string[];
+  const paragraphs = ["El software incluye actualizaciones de seguridad según el plan vigente.", "El hardware se garantiza según el proveedor del kit y la factura; plazos se confirman en la orden.", "Defectos de instalación atribuibles al canal comercial se atienden sin costo de visita remota inicial."] as string[];
   return (
     <article className="mx-auto max-w-3xl px-4 py-14 sm:px-6">
       <JsonLd data={breadcrumbJsonLd([{ name: "Inicio", path: "/" }, { name: "Garantías", path: "/legal/garantias" }])} />

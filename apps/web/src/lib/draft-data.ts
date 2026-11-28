@@ -10,7 +10,7 @@ import type {
   SolutionSector,
 } from "./types";
 
-/** DRAFT preview content — used only when commercial-api is unreachable and NODE_ENV !== production. */
+/** Preview content — used only when commercial-api is unreachable and NODE_ENV !== production. */
 export const draftSettings: SiteSettings = {
   promoBar: {
     message: "Kit de apertura con instalación remota incluida este mes.",
@@ -25,57 +25,142 @@ export const draftSettings: SiteSettings = {
 
 export const draftPlans: Plan[] = [
   {
-    id: "plan-caja-esencial",
-    slug: "caja-esencial",
-    name: "Caja Esencial",
-    tagline: "Para un solo punto de venta que necesita vender sin depender de Internet.",
+    id: "plan-esencial",
+    slug: "esencial",
+    name: "Esencial",
+    tagline: "Para un punto de venta que necesita vender sin depender de internet",
     description:
-      "Licencia local-first para cajero, inventario básico, cierre de caja y soporte por canal comercial. Ideal para tiendas de barrio y panaderías que arrancan digitalización.",
-    priceMonthly: { amountCents: 8900000, currency: "COP" },
-    priceYearly: { amountCents: 89000000, currency: "COP" },
+      "Ideal para tiendas y panaderías que arrancan. Una licencia = una caja. Precio de referencia pendiente de publicación comercial.",
+    priceMonthly: { amountCents: 49900, currency: "COP" },
+    priceYearly: { amountCents: 499000, currency: "COP" },
+    primaryInterval: "MONTHLY",
+    prices: {
+      MONTHLY: { planPriceId: "draft-esencial-m", amountCents: 49900, currency: "COP", version: 1 },
+      ANNUAL: { planPriceId: "draft-esencial-a", amountCents: 499000, currency: "COP", version: 1 },
+    },
     highlights: [
-      "Venta local-first en Electron o Android",
-      "Inventario y arqueo de caja",
-      "Actualizaciones de seguridad incluidas",
-      "Capacitación remota de arranque",
+      "Vende incluso cuando se interrumpe internet",
+      "Control de inventario",
+      "Soporte por canal comercial",
     ],
-    includesHardwareHint: "Puede contratarse solo software o con kit de hardware.",
-    status: "disponible",
+    features: [
+      {
+        code: "local_first_sales",
+        label: "Vende incluso cuando se interrumpe internet",
+        commercialStatus: "disponible",
+      },
+      { code: "inventory", label: "Control de inventario", commercialStatus: "disponible" },
+    ],
+    includesHardwareHint: "Puede contratarse solo software o con kit de equipos.",
+    status: "borrador",
     featured: true,
+    supportNote: "Soporte comercial por WhatsApp y correo",
+    licensesPerUnit: 1,
   },
   {
-    id: "plan-negocio",
-    slug: "negocio",
-    name: "Negocio",
-    tagline: "Multi-caja, reportes y control por sucursal para comercios en crecimiento.",
+    id: "plan-profesional",
+    slug: "profesional",
+    name: "Profesional",
+    tagline: "Para comercios que crecen con varias cajas y sincronización",
     description:
-      "Agrega supervisión, reportes comerciales, catálogo ampliado y preparación para facturación electrónica según el estado de certificación del tenant.",
-    priceMonthly: { amountCents: 14900000, currency: "COP" },
-    priceYearly: { amountCents: 149000000, currency: "COP" },
+      "Incluye sincronización al recuperar conexión y facturación electrónica cuando el servicio esté contratado y disponible.",
+    priceMonthly: { amountCents: 79900, currency: "COP" },
+    priceYearly: { amountCents: 799000, currency: "COP" },
+    primaryInterval: "MONTHLY",
+    prices: {
+      MONTHLY: { planPriceId: "draft-profesional-m", amountCents: 79900, currency: "COP", version: 1 },
+      ANNUAL: { planPriceId: "draft-profesional-a", amountCents: 799000, currency: "COP", version: 1 },
+    },
     highlights: [
-      "Varias cajas por sucursal",
-      "Roles administrador / supervisor / cajero",
-      "Reportes de ventas e inventario",
-      "Sincronización central cuando hay conectividad",
+      "Varias cajas en tu negocio",
+      "Sincroniza información cuando recuperes la conexión",
+      "Emite facturas electrónicas cuando el servicio esté contratado y disponible",
     ],
-    status: "disponible",
+    features: [
+      {
+        code: "local_first_sales",
+        label: "Vende incluso cuando se interrumpe internet",
+        commercialStatus: "disponible",
+      },
+      { code: "multi_caja", label: "Varias cajas en tu negocio", commercialStatus: "disponible" },
+      {
+        code: "central_sync",
+        label: "Sincroniza información cuando recuperes la conexión",
+        commercialStatus: "en_certificacion",
+      },
+      {
+        code: "factus_electronic_invoice",
+        label: "Emite facturas electrónicas cuando el servicio esté contratado y disponible",
+        commercialStatus: "en_certificacion",
+      },
+    ],
+    status: "borrador",
     featured: true,
+    supportNote: "Soporte prioritario en horario hábil",
+    licensesPerUnit: 1,
   },
   {
-    id: "plan-empresa",
-    slug: "empresa",
-    name: "Empresa",
-    tagline: "Operación multi-sucursal con acompañamiento comercial dedicado.",
+    id: "plan-empresarial",
+    slug: "empresarial",
+    name: "Empresarial",
+    tagline: "Para operaciones con más cajas y expansión a sucursales",
     description:
-      "Pensado para redes de droguerías, supermercados pequeños y grupos con varias sedes. Incluye onboarding guiado y canal prioritario de soporte.",
-    priceMonthly: { amountCents: 24900000, currency: "COP" },
+      "Pensado para redes en crecimiento. Reportes y multi-sucursal según disponibilidad publicada.",
+    priceMonthly: { amountCents: 119900, currency: "COP" },
+    priceYearly: { amountCents: 1199000, currency: "COP" },
+    primaryInterval: "MONTHLY",
+    prices: {
+      MONTHLY: { planPriceId: "draft-empresarial-m", amountCents: 119900, currency: "COP", version: 1 },
+      ANNUAL: { planPriceId: "draft-empresarial-a", amountCents: 1199000, currency: "COP", version: 1 },
+    },
     highlights: [
-      "Multi-sucursal con segregación de datos",
-      "Onboarding y checklist de puesta en marcha",
-      "Soporte prioritario en horario hábil",
-      "Integración con kits certificados por sector",
+      "Varias cajas en tu negocio",
+      "Reportes de tu operación",
+      "Varias sucursales",
     ],
-    status: "en_certificacion",
+    features: [
+      { code: "multi_caja", label: "Varias cajas en tu negocio", commercialStatus: "disponible" },
+      { code: "reporting", label: "Reportes de tu operación", commercialStatus: "proximamente" },
+      { code: "multi_branch", label: "Varias sucursales", commercialStatus: "proximamente" },
+    ],
+    status: "borrador",
+    supportNote: "Acompañamiento comercial dedicado",
+    licensesPerUnit: 1,
+  },
+  {
+    id: "plan-perpetua",
+    slug: "perpetua",
+    name: "Perpetua",
+    tagline: "Licencia de pago único para una caja",
+    description:
+      "Oferta de licencia perpetua (pago único). Una licencia = una caja. Precio de referencia pendiente de publicación.",
+    priceMonthly: { amountCents: 1490000, currency: "COP" },
+    pricePerpetual: { amountCents: 1490000, currency: "COP" },
+    primaryInterval: "PERPETUAL",
+    prices: {
+      PERPETUAL: {
+        planPriceId: "draft-perpetua-p",
+        amountCents: 1490000,
+        currency: "COP",
+        version: 1,
+      },
+    },
+    highlights: [
+      "Vende incluso cuando se interrumpe internet",
+      "Control de inventario",
+      "Pago único",
+    ],
+    features: [
+      {
+        code: "local_first_sales",
+        label: "Vende incluso cuando se interrumpe internet",
+        commercialStatus: "disponible",
+      },
+      { code: "inventory", label: "Control de inventario", commercialStatus: "disponible" },
+    ],
+    status: "borrador",
+    supportNote: "Soporte comercial según condiciones del contrato",
+    licensesPerUnit: 1,
   },
 ];
 
@@ -87,12 +172,12 @@ export const draftEquipment: Equipment[] = [
     category: "Punto de venta",
     summary: "All-in-one para mostrador con pantalla capacitiva y montaje estable.",
     description:
-      "Composición de referencia para kits de caja. El modelo comercial exacto se confirma en la orden según disponibilidad de proveedor homologado.",
-    price: { amountCents: 189000000, currency: "COP" },
+      "Ilustración referencial para kits de caja. El modelo comercial exacto se confirma en la orden según disponibilidad del proveedor.",
+    price: { amountCents: 1890000, currency: "COP" },
     image: "/images/hardware/terminal-tactil.svg",
     status: "disponible",
     featured: true,
-    specs: ["Pantalla 15\"", "SSD", "Windows 11 IoT o equivalente homologado", "Puertos USB/serie para periféricos"],
+    specs: ["Pantalla 15\"", "SSD", "Windows 11 IoT o equivalente", "Puertos USB/serie para periféricos"],
   },
   {
     id: "eq-impresora-termica",
@@ -100,8 +185,8 @@ export const draftEquipment: Equipment[] = [
     name: "Impresora térmica 80 mm",
     category: "Impresión",
     summary: "Impresión de tiquetes y comandas para mostrador y cocina.",
-    description: "Compatible con el canal de impresión del POS Local Service. Incluye guía de cableado en la instalación remota.",
-    price: { amountCents: 32000000, currency: "COP" },
+    description: "Compatible con el canal de impresión de la caja. Incluye guía de cableado en la instalación remota.",
+    price: { amountCents: 320000, currency: "COP" },
     image: "/images/hardware/impresora-termica.svg",
     status: "disponible",
     featured: true,
@@ -114,7 +199,7 @@ export const draftEquipment: Equipment[] = [
     category: "Captura",
     summary: "Escaneo 1D/2D para mostrador y recepción de mercancía.",
     description: "Periférico de kit. La homologación exacta depende del lote comercial vigente.",
-    price: { amountCents: 18000000, currency: "COP" },
+    price: { amountCents: 180000, currency: "COP" },
     image: "/images/hardware/lector-barras.svg",
     status: "disponible",
     specs: ["1D/2D", "USB HID", "Soporte de mostrador opcional"],
@@ -126,8 +211,8 @@ export const draftEquipment: Equipment[] = [
     category: "Pesaje",
     summary: "Para avícolas, panaderías y mostradores de peso variable.",
     description:
-      "Integración de balanza en certificación sectorial. No se ofrece como disponible comercial hasta cerrar el adapter del kit correspondiente.",
-    price: { amountCents: 75000000, currency: "COP" },
+      "Balanza en certificación sectorial. No se ofrece como disponible comercial hasta cerrar la integración del kit correspondiente.",
+    price: { amountCents: 750000, currency: "COP" },
     image: "/images/hardware/balanza.svg",
     status: "en_certificacion",
     specs: ["Puerto serie/USB", "Modo peso-precio", "Requiere kit sectorial"],
@@ -139,11 +224,26 @@ export const draftEquipment: Equipment[] = [
     category: "Efectivo",
     summary: "Apertura por impresora o relay según configuración del kit.",
     description: "Complemento físico para arqueos y control de efectivo en caja.",
-    price: { amountCents: 22000000, currency: "COP" },
+    price: { amountCents: 220000, currency: "COP" },
     image: "/images/hardware/cajon-monedero.svg",
     status: "disponible",
     featured: true,
     specs: ["Apertura eléctrica", "Bandeja de billetes y monedas"],
+  },
+  {
+    id: "kit-esencial",
+    slug: "kit-esencial",
+    name: "Kit Esencial",
+    category: "Kit",
+    summary: "Hardware de referencia + 1 licencia para arrancar tu caja.",
+    description: "Kit provisional con hardware de referencia y una licencia (1 caja).",
+    price: { amountCents: 899000, currency: "COP" },
+    image: "/images/hardware/terminal-tactil.svg",
+    status: "borrador",
+    featured: true,
+    specs: ["Kit comercial", "1 licencia"],
+    kitId: "kit-esencial",
+    priceVersion: 1,
   },
 ];
 
@@ -151,20 +251,34 @@ export const draftPromotions: Promotion[] = [
   {
     id: "promo-kit-apertura",
     slug: "kit-apertura",
-    title: "Kit de apertura",
-    summary: "Plan Caja Esencial + terminal + impresora con instalación remota incluida.",
+    title: "Kit de apertura con instalación remota",
+    summary:
+      "Arma tu primer mostrador: plan Esencial + terminal + impresora. Instalación remota incluida al confirmar la orden publicada.",
     validUntil: "2026-12-31",
-    ctaHref: "/contratar?plan=caja-esencial",
-    ctaLabel: "Contratar kit",
+    ctaHref: "/contratar?plan=esencial",
+    ctaLabel: "Armar kit y contratar",
     status: "disponible",
   },
   {
-    id: "promo-demo-guiada",
-    slug: "demo-guiada",
-    title: "Demo guiada sin compromiso",
-    summary: "Agenda una sesión con un asesor comercial para revisar tu sector y el kit recomendado.",
-    ctaHref: "/solicitar-demo",
-    ctaLabel: "Solicitar demo",
+    id: "promo-prueba-5-dias",
+    slug: "prueba-5-dias",
+    title: "Prueba 5 días para dueños de local",
+    summary:
+      "Evalúa el flujo comercial con registro CRM, condiciones claras y bloqueo automático al vencer. Luego contrata el plan que necesitas.",
+    validUntil: "2026-12-31",
+    ctaHref: "/prueba-5-dias",
+    ctaLabel: "Prueba 5 días",
+    status: "disponible",
+  },
+  {
+    id: "promo-noche-comercio",
+    slug: "noche-comercio",
+    title: "Descuento nocturno en kits publicados",
+    summary:
+      "Fuera de horario pico, priorizamos pedidos de kits completos con lead time confirmado al contratar. Vigencia publicada en /promociones.",
+    validUntil: "2026-12-31",
+    ctaHref: "/promociones",
+    ctaLabel: "Ver campaña nocturna",
     status: "disponible",
   },
 ];
@@ -190,7 +304,7 @@ export const draftCoverage: CoverageCity[] = [
     slug: "cali",
     name: "Cali",
     department: "Valle del Cauca",
-    summary: "Acompañamiento comercial y envío de kits homologados.",
+    summary: "Acompañamiento comercial y envío de kits confirmados al contratar.",
     leadTimeDays: 5,
     status: "disponible",
   },
@@ -218,9 +332,9 @@ export const draftSolutions: SolutionSector[] = [
     name: "Tiendas",
     headline: "Caja rápida para el mostrador de barrio",
     summary:
-      "Vende con código de barras, controla inventario corto y cierra caja sin depender de la nube en cada ticket.",
+      "Vende con código de barras, controla inventario corto y cierra caja aunque se interrumpa internet.",
     challenges: ["Filas en horas pico", "Merma por desorden de stock", "Cajeros rotativos"],
-    capabilities: ["Venta local-first", "Arqueo", "Catálogo sencillo", "Reportes diarios"],
+    capabilities: ["Venta sin internet", "Arqueo", "Catálogo sencillo", "Reportes diarios"],
     image: "/images/sectors/tiendas.svg",
   },
   {
@@ -229,7 +343,7 @@ export const draftSolutions: SolutionSector[] = [
     headline: "Varias cajas con control por sucursal",
     summary: "Opera líneas de caja, receptores y supervisión con segregación de datos por sede.",
     challenges: ["Multi-caja", "Turnos", "Recepción de mercancía"],
-    capabilities: ["Roles", "Inventario", "Sincronización central", "Kits de hardware"],
+    capabilities: ["Roles", "Inventario", "Sincronización al recuperar conexión", "Kits de hardware"],
     image: "/images/sectors/supermercados.svg",
   },
   {
@@ -249,6 +363,15 @@ export const draftSolutions: SolutionSector[] = [
     challenges: ["Pesaje", "Etiquetado", "Merma"],
     capabilities: ["Balanza en certificación", "Tickets", "Inventario por peso"],
     image: "/images/sectors/avicolas.svg",
+  },
+  {
+    slug: "salsamentarias",
+    name: "Salsamentarias",
+    headline: "Mostrador rápido con peso y porciones",
+    summary: "Venta por peso o unidad, control de porciones y tickets claros para el cliente del barrio.",
+    challenges: ["Peso variable", "Porciones", "Rotación de producto"],
+    capabilities: ["Caja rápida", "Tickets", "Inventario básico", "Balanza en certificación"],
+    image: "/images/sectors/salsamentarias.svg",
   },
   {
     slug: "panaderias",
@@ -272,31 +395,31 @@ export const draftSolutions: SolutionSector[] = [
 
 export const draftFaq: FaqItem[] = [
   {
-    id: "faq-local-first",
+    id: "faq-sin-internet",
     question: "¿Puedo vender si se cae Internet?",
     answer:
-      "Sí. El POS local está diseñado local-first: una venta ordinaria autorizada no depende de Internet. La sincronización con Central ocurre cuando hay conectividad.",
+      "Sí. Una venta ordinaria autorizada no depende de Internet. Cuando recuperas la conexión, la información se sincroniza con el servicio central.",
     category: "Producto",
   },
   {
     id: "faq-cajero-web",
     question: "¿El cajero opera desde este sitio web?",
     answer:
-      "No. Los cajeros usan la aplicación Electron en Windows o la app Android del kit contratado. Este sitio es comercial: planes, equipos, contratación y soporte.",
+      "No. Los cajeros usan la aplicación en Windows o la app Android del kit contratado. Este sitio es comercial: planes, equipos, contratación y soporte.",
     category: "Acceso",
   },
   {
     id: "faq-facturacion",
     question: "¿Incluye facturación electrónica DIAN?",
     answer:
-      "La facturación electrónica se integra por adapters (por ejemplo Factus) y su disponibilidad se muestra según estado: Disponible, En certificación o Próximamente. Nunca se publica como disponible si aún no lo está.",
+      "La facturación electrónica se ofrece cuando el servicio esté contratado y disponible. Su estado se muestra con claridad: Disponible, En certificación o Próximamente.",
     category: "Fiscal",
   },
   {
     id: "faq-instalacion",
     question: "¿Cómo se instala el software de caja?",
     answer:
-      "Tras contratar, recibes el camino de instalación Electron (Windows) o Android según tu kit. La puesta en marcha la acompaña el canal comercial; no se habilita un POS web para cajero.",
+      "Tras contratar, recibes el camino de instalación en Windows o Android según tu kit. La puesta en marcha la acompaña el canal comercial; no se habilita un POS web para cajero.",
     category: "Instalación",
   },
   {
@@ -318,26 +441,26 @@ export const draftFaq: FaqItem[] = [
 export const draftFeatures: FeatureFlag[] = [
   {
     id: "feat-caja",
-    name: "Caja local-first",
-    description: "Venta, arqueo y operación offline-capable en Electron/Android.",
+    name: "Vende incluso cuando se interrumpe internet",
+    description: "Venta, arqueo y operación de caja en el local sin depender de la nube en cada ticket.",
     status: "disponible",
   },
   {
     id: "feat-inventario",
-    name: "Inventario",
+    name: "Control de inventario",
     description: "Existencias, movimientos y alertas básicas.",
     status: "disponible",
   },
   {
     id: "feat-balanza",
     name: "Balanza",
-    description: "Adapter de pesaje para sectores de peso variable.",
+    description: "Pesaje para sectores de peso variable.",
     status: "en_certificacion",
   },
   {
     id: "feat-facturacion",
     name: "Facturación electrónica",
-    description: "Emisión vía provider fiscal homologado.",
+    description: "Emisión cuando el servicio esté contratado y disponible.",
     status: "en_certificacion",
   },
   {
@@ -356,17 +479,17 @@ export const draftFeatures: FeatureFlag[] = [
 
 export const draftBlog: BlogPost[] = [
   {
-    slug: "local-first-en-el-mostrador",
-    title: "Por qué local-first importa en el mostrador colombiano",
+    slug: "vender-sin-internet-en-el-mostrador",
+    title: "Por qué importa vender aunque se interrumpa internet",
     excerpt:
-      "Una caída de Internet no debería frenar la fila. Explicamos cómo Camacho POS separa la venta local de la sincronización central.",
+      "Una caída de Internet no debería frenar la fila. Explicamos cómo Camacho POS separa la venta en el local de la sincronización en la nube.",
     publishedAt: "2026-11-10",
     readingMinutes: 6,
     tags: ["Producto", "Operación"],
     body: [
       "En muchos barrios la conectividad es intermitente. Un POS que exige nube para cada ticket convierte un corte breve en pérdida de venta y filas.",
-      "Camacho POS Colombia opera con POS Local Service como único escritor de SQLite local. La venta autorizada continúa; el outbox sincroniza después.",
-      "Este enfoque no elimina la nube: la pone en el lugar correcto — autoridad comercial, licencias y consolidación — sin bloquear el mostrador.",
+      "Camacho POS Colombia mantiene la venta autorizada en el local. Cuando recuperas la conexión, la información se sincroniza.",
+      "Este enfoque no elimina la nube: la pone en el lugar correcto — licencias y consolidación — sin bloquear el mostrador.",
     ],
   },
   {
@@ -378,20 +501,20 @@ export const draftBlog: BlogPost[] = [
     tags: ["Equipos", "Sectores"],
     body: [
       "Un kit de tienda prioriza lector, impresora y cajón. Una avícola necesita balanza en certificación. Una droguería exige disciplina de inventario.",
-      "En este sitio cada capacidad muestra su estado real: Disponible, En certificación, Próximamente o No publicada.",
+      "En este sitio cada capacidad muestra su estado real: Disponible, En certificación, Próximamente o Pendiente de publicación.",
       "Así el comercio contrata con evidencia, no con promesas genéricas de catálogo.",
     ],
   },
   {
     slug: "cajero-no-usa-la-web",
     title: "El cajero no opera en la web comercial",
-    excerpt: "La web vende y contrata. La caja corre en Electron o Android. Esta separación evita confusiones de rol y seguridad.",
+    excerpt: "La web vende y contrata. La caja corre en la aplicación instalada. Esta separación evita confusiones de rol y seguridad.",
     publishedAt: "2026-11-18",
     readingMinutes: 4,
     tags: ["Acceso", "Seguridad"],
     body: [
-      "Superadministrador comercial gestiona licencias con autoridad GLOBAL. No es cajero ni recibe carrito de mostrador.",
-      "Tras iniciar sesión en Central, el destino depende del rol. Cajeros reciben el camino de instalación de la app de caja.",
+      "Superadministrador comercial gestiona licencias. No es cajero ni recibe carrito de mostrador.",
+      "Tras iniciar sesión, el destino depende del rol. Cajeros reciben el camino de instalación de la app de caja.",
       "Mantener esa frontera reduce riesgo y deja clara la responsabilidad de cada perfil.",
     ],
   },

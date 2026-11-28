@@ -21,9 +21,19 @@ import { buildMetadata, faqJsonLd, JsonLd } from "@/lib/seo";
 export const metadata = buildMetadata({
   title: "Camacho POS Colombia | Software POS y kits para tu negocio",
   description:
-    "Vende, controla y haz crecer tu negocio con Camacho POS Colombia. Software local-first, planes comerciales y kits de equipos.",
+    "Vende, controla y haz crecer tu negocio con Camacho POS Colombia. Software POS, planes comerciales y kits de equipos para el comercio colombiano.",
   path: "/",
 });
+
+const SECTOR_STRIP = [
+  { slug: "tiendas", name: "Tiendas" },
+  { slug: "supermercados", name: "Supermercados" },
+  { slug: "droguerias", name: "Droguerías" },
+  { slug: "avicolas", name: "Avícolas" },
+  { slug: "salsamentarias", name: "Salsamentarias" },
+  { slug: "panaderias", name: "Panaderías" },
+  { slug: "pastelerias", name: "Pastelerías" },
+];
 
 export default async function HomePage() {
   const [plans, equipment, promotions, coverage, solutions, faq, features] = await Promise.all([
@@ -44,88 +54,136 @@ export default async function HomePage() {
       ? "draft"
       : "api";
 
+  const faqLd = faqJsonLd(
+    faq.data.slice(0, 6).map((item) => ({ question: item.question, answer: item.answer })),
+  );
+
   return (
     <>
-      <JsonLd data={faqJsonLd(faq.data.slice(0, 6).map((item) => ({ question: item.question, answer: item.answer })))} />
+      {faqLd ? <JsonLd data={faqLd} /> : null}
       {source === "draft" ? <DraftBanner source="draft" /> : null}
 
       <section className="relative overflow-hidden bg-[var(--navy)] text-[var(--ivory)]">
         <div
-          className="absolute inset-0 opacity-40"
+          className="pointer-events-none absolute inset-0"
           style={{
             background:
-              "radial-gradient(circle at 20% 20%, rgba(247,200,60,0.35), transparent 40%), radial-gradient(circle at 80% 0%, rgba(22,129,119,0.35), transparent 35%)",
+              "radial-gradient(ellipse at 12% 18%, rgba(247,200,60,0.42), transparent 46%), radial-gradient(ellipse at 88% 8%, rgba(22,129,119,0.28), transparent 40%), linear-gradient(160deg, #0c1624 0%, #101c2d 55%, #15253a 100%)",
           }}
         />
-        <div className="relative mx-auto grid max-w-6xl gap-10 px-4 py-20 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:px-8 lg:py-28">
+        <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-1/2 bg-[linear-gradient(90deg,transparent,rgba(246,245,240,0.04))] lg:block" />
+        <div className="relative mx-auto grid max-w-6xl gap-12 px-4 py-16 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:px-8 lg:py-24">
           <div className="reveal">
             <Image
               src="/brand/logo-yellow.png"
               alt="Camacho POS Colombia"
-              width={320}
-              height={115}
-              className="mb-8 h-16 w-auto sm:h-20"
+              width={420}
+              height={150}
+              className="mb-8 h-20 w-auto sm:h-24"
               priority
             />
-            <h1 className="font-serif text-4xl leading-tight sm:text-5xl lg:text-[3.25rem]">
-              Vende, controla y haz crecer tu negocio con Camacho POS Colombia
+            <h1 className="max-w-xl text-4xl font-bold leading-[1.08] tracking-tight text-balance sm:text-5xl lg:text-[3.2rem]">
+              El POS que vende contigo, en el mostrador
             </h1>
-            <p className="mt-5 max-w-xl text-lg text-white/75">
-              Software POS local-first y kits de equipos para tiendas, supermercados, droguerías, avícolas,
-              panaderías y pastelerías. Contrata en línea; el cajero opera en Electron o Android.
+            <p className="mt-5 max-w-xl text-lg text-white/90">
+              Software y equipos para tiendas, supermercados, droguerías, avícolas, salsamentarias, panaderías y
+              pastelerías. Contrata en línea o activa una prueba de 5 días; tu caja opera en Windows o Android.
             </p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Link href="/planes">
-                <Button size="lg">Ver planes</Button>
+            <div className="cta-row mt-8">
+              <Link href="/contratar" className="inline-flex max-w-full">
+                <Button size="lg">Contratar ahora</Button>
               </Link>
-              <Link href="/contacto">
-                <Button size="lg" variant="outline" className="border-[var(--ivory)] text-[var(--ivory)] hover:bg-white/10">
-                  Solicitar asesoría
+              <Link href="/prueba-5-dias" className="inline-flex max-w-full">
+                <Button size="lg" variant="outline" className="border-[var(--yellow)] bg-[var(--yellow)] text-[var(--navy)] hover:brightness-95">
+                  Prueba 5 días
                 </Button>
               </Link>
-              <Link href="/solicitar-demo">
+              <Link href="/planes" className="inline-flex max-w-full">
+                <Button size="lg" variant="outline" className="border-[var(--ivory)] text-[var(--ivory)] hover:bg-white/10">
+                  Ver planes
+                </Button>
+              </Link>
+              <Link href="/planes?solucion=completo" className="inline-flex max-w-full">
                 <Button size="lg" variant="ghost" className="text-[var(--yellow)] hover:bg-white/10">
-                  Demo
+                  POS completo
                 </Button>
               </Link>
             </div>
           </div>
-          <div className="reveal-delay relative min-h-[280px]">
-            <Image
-              src="/images/software/pos-ui.svg"
-              alt="Ilustración de la interfaz de caja Camacho POS"
-              fill
-              className="float-soft object-contain"
-              sizes="(max-width:1024px) 100vw, 40vw"
-              priority
-            />
+
+          <div className="reveal-delay relative grid min-h-[300px] gap-4 sm:grid-cols-2 lg:min-h-[360px]">
+            <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-3">
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--yellow)]">Software</p>
+              <div className="relative aspect-[4/3]">
+                <Image
+                  src="/images/software/pos-ui.svg"
+                  alt="Ilustración referencial de la interfaz de caja Camacho POS"
+                  fill
+                  className="float-soft object-contain"
+                  sizes="(max-width:1024px) 50vw, 22vw"
+                  priority
+                />
+              </div>
+            </div>
+            <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-[color-mix(in_srgb,var(--yellow)_12%,transparent)] p-3">
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--yellow)]">Equipos</p>
+              <div className="relative aspect-[4/3]">
+                <Image
+                  src="/images/hardware/terminal-tactil.svg"
+                  alt="Ilustración referencial de terminal y periféricos"
+                  fill
+                  className="object-contain"
+                  sizes="(max-width:1024px) 50vw, 22vw"
+                  priority
+                />
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
+      <section className="border-b border-[var(--border)] bg-[var(--ivory)]">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-2 px-4 py-4 sm:px-6 lg:px-8">
+          <p className="mr-2 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">Sectores</p>
+          {SECTOR_STRIP.map((sector) => (
+            <Link
+              key={sector.slug}
+              href={`/soluciones/${sector.slug}`}
+              className="inline-flex min-h-11 items-center rounded-md border border-[var(--border)] bg-white/80 px-3 py-2 text-sm font-medium text-[var(--navy)] transition hover:border-[var(--teal)] hover:text-[var(--teal)]"
+            >
+              {sector.name}
+            </Link>
+          ))}
+        </div>
+      </section>
+
       <Section
-        eyebrow="Beneficios"
-        title="Operación de mostrador sin drama de conectividad"
-        lead="Local-first, roles claros y estados de capacidad transparentes. No vendemos lo que aún no está listo."
+        eyebrow="Beneficios que cierran venta"
+        title="Más tickets, menos fricción en caja"
+        lead="Mensajes comerciales concretos para el dueño del local: continuidad, control y claridad de lo que sí está listo."
       >
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {[
             {
-              title: "Venta aunque falle Internet",
-              body: "El POS Local Service escribe en SQLite/WAL. La fila no se detiene por un corte breve.",
+              title: "La fila no se detiene",
+              body: "Con la sesión y la licencia vigentes, la caja puede registrar ventas en efectivo durante un corte. Los movimientos pendientes se envían al recuperar la conexión.",
             },
             {
-              title: "Roles sin confusión",
-              body: "Superadmin comercial no es cajero. Administrador y supervisor tampoco. Cada perfil tiene su destino.",
+              title: "Control por rol, no por caos",
+              body: "Dueño, supervisor y cajero con destinos distintos. El superadmin comercial no opera como cajero.",
             },
             {
-              title: "Estados honestos",
-              body: "Disponible, En certificación, Próximamente o No publicada. Sin fingir disponibilidad.",
+              title: "Verificación de pagos desde Caja",
+              body: "La consulta al proveedor se realiza desde la pantalla de Caja cuando la integración está habilitada. La aprobación manual de una transferencia queda identificada como una acción del supervisor.",
+              certification: true,
             },
           ].map((item) => (
-            <article key={item.title} className="border-l-4 border-[var(--teal)] pl-4">
-              <h3 className="font-serif text-xl">{item.title}</h3>
+            <article key={item.title} className="surface-card border-l-4 border-[var(--teal)] p-5 pl-4">
+              <h3 className="text-xl font-bold">{item.title}</h3>
               <p className="mt-2 text-[var(--muted)]">{item.body}</p>
+              {item.certification && (
+                <div className="mt-3"><StatusBadge status="en_certificacion" /></div>
+              )}
             </article>
           ))}
         </div>
@@ -135,11 +193,11 @@ export default async function HomePage() {
         tone="navy"
         eyebrow="Software"
         title="Una caja pensada para el comercio colombiano"
-        lead="Catálogo, venta, inventario, arqueo y reportes en una experiencia conectada a servicios reales — no a una maqueta."
+        lead="Catálogo, venta, inventario, arqueo y reportes en una experiencia conectada a servicios reales."
       >
         <div className="editorial-grid">
           <div className="relative min-h-[260px] overflow-hidden rounded-lg bg-white/5 p-4">
-            <Image src="/images/software/pos-ui.svg" alt="Presentación software POS" fill className="object-contain p-4" />
+            <Image src="/images/software/pos-ui.svg" alt="Ilustración referencial del software POS" fill className="object-contain p-4" />
           </div>
           <ul className="space-y-4 text-white/80">
             {features.data.map((feature) => (
@@ -158,13 +216,13 @@ export default async function HomePage() {
       <Section
         eyebrow="Software vs kit"
         title="Elige solo licencia o kit completo"
-        lead="Puedes contratar el plan de software y usar tu hardware homologado, o armar un kit con terminal, impresora y periféricos."
+        lead="Puedes contratar el plan de software y usar tu hardware, o armar un kit con terminal, impresora y periféricos."
       >
         <div className="grid gap-8 md:grid-cols-2">
           <article className="bg-white/60 p-6">
             <h3 className="font-serif text-2xl">Solo software</h3>
             <p className="mt-3 text-[var(--muted)]">
-              Licencia, actualizaciones y soporte según plan. Instalación Electron o Android documentada en Descargas.
+              Licencia, actualizaciones y soporte según plan. Instalación en Windows o Android documentada en Descargas.
             </p>
             <Link href="/planes" className="mt-4 inline-block font-medium text-[var(--teal)] underline-offset-2 hover:underline">
               Ver planes
@@ -173,7 +231,7 @@ export default async function HomePage() {
           <article className="bg-[var(--navy)] p-6 text-[var(--ivory)]">
             <h3 className="font-serif text-2xl">Software + kit</h3>
             <p className="mt-3 text-white/75">
-              Plan + equipos seleccionados del catálogo. El carrito consolida ítems reales con id de plan y equipo.
+              Plan + equipos seleccionados del catálogo. El carrito consolida ítems reales con identificadores de plan y equipo.
             </p>
             <Link href="/equipos" className="mt-4 inline-block font-medium text-[var(--yellow)] underline-offset-2 hover:underline">
               Ver equipos
@@ -182,7 +240,7 @@ export default async function HomePage() {
         </div>
       </Section>
 
-      <Section eyebrow="Capacidades" title="Iconografía propia del producto" lead="Set SVG original para las áreas que importan en el mostrador y en la operación.">
+      <Section eyebrow="Capacidades" title="Áreas que importan en el mostrador" lead="Iconografía propia para las operaciones del día a día.">
         <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-9">
           {featureIconCatalog.map((item) => (
             <Link key={item.name} href={item.href} className="flex flex-col items-center gap-2 text-center text-sm font-medium">
@@ -195,20 +253,20 @@ export default async function HomePage() {
 
       <Section
         tone="teal"
-        eyebrow="Demo de flujo"
+        eyebrow="Cómo funciona"
         title="Del catálogo al ticket, sin inventar un POS web"
         lead="Esta web comercializa y contrata. La operación de cajero ocurre en la app instalada tras el alta."
       >
         <ol className="grid gap-4 md:grid-cols-4">
           {[
             "Elige plan y equipos",
-            "Contrata o agenda demo",
-            "Recibe instalación Electron/Android",
+            "Contrata o activa Prueba 5 días",
+            "Recibe instalación Windows o Android",
             "Cajero opera en el dispositivo del kit",
           ].map((step, index) => (
-            <li key={step} className="bg-white/70 p-4">
+            <li key={step} className="surface-card p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--teal)]">Paso {index + 1}</p>
-              <p className="mt-2 font-serif text-xl">{step}</p>
+              <p className="mt-2 text-xl font-bold">{step}</p>
             </li>
           ))}
         </ol>
@@ -230,15 +288,15 @@ export default async function HomePage() {
         </div>
       </Section>
 
-      <Section eyebrow="Planes" title="Licencias claras, precios en COP" lead="Los planes se cargan desde commercial-api. Si el API no responde en desarrollo, verás preview DRAFT.">
+      <Section eyebrow="Planes" title="Licencias claras, precios en COP" lead="Precios en pesos colombianos. Los precios de referencia se confirman al publicar la oferta comercial.">
         <div className="grid gap-5 lg:grid-cols-3">
-          {plans.data.filter((plan) => plan.status !== "no_publicada").map((plan) => (
+          {plans.data.filter((plan) => plan.status !== "no_publicada").slice(0, 3).map((plan) => (
             <PlanCard key={plan.id} plan={plan} />
           ))}
         </div>
       </Section>
 
-      <Section eyebrow="Equipos" title="Hardware destacado" lead="Ilustraciones SVG propias; el modelo comercial exacto se confirma en la orden.">
+      <Section eyebrow="Equipos" title="Hardware destacado" lead="Ilustraciones referenciales; el modelo comercial exacto se confirma en la orden.">
         <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
           {equipment.data.filter((item) => item.featured).map((item) => (
             <EquipmentCard key={item.id} item={item} />
@@ -251,19 +309,27 @@ export default async function HomePage() {
         </div>
       </Section>
 
-      <Section tone="navy" eyebrow="Promociones" title="Ofertas vigentes" lead="Publicadas desde ajustes del API. Sin contadores falsos ni urgencia inventada.">
+      <Section
+        tone="navy"
+        eyebrow="Campañas"
+        title="Ofertas que empujan a decidir"
+        lead="Kits de apertura, prueba de 5 días y descuentos nocturnos publicados. Sin contadores falsos."
+      >
         <div className="grid gap-4 md:grid-cols-2">
           {promotions.data.map((promo) => (
-            <article key={promo.id} className="border border-white/15 p-6">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <h3 className="font-serif text-2xl">{promo.title}</h3>
+            <article key={promo.id} className="min-w-0 border border-white/15 bg-white/5 p-6">
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <h3 className="min-w-0 text-2xl font-bold leading-snug">{promo.title}</h3>
                 <StatusBadge status={promo.status} />
               </div>
               <p className="text-white/75">{promo.summary}</p>
               {promo.validUntil ? (
                 <p className="mt-3 text-sm text-white/55">Vigente hasta {promo.validUntil}</p>
               ) : null}
-              <Link href={promo.ctaHref} className="mt-4 inline-block text-[var(--yellow)] underline-offset-2 hover:underline">
+              <Link
+                href={promo.ctaHref}
+                className="mt-4 inline-flex min-h-11 items-center rounded-md bg-[var(--yellow)] px-4 text-sm font-bold text-[var(--navy)] hover:brightness-95"
+              >
                 {promo.ctaLabel}
               </Link>
             </article>
@@ -291,8 +357,8 @@ export default async function HomePage() {
           {[
             { t: "Elige", d: "Plan y equipos con estado Disponible." },
             { t: "Carrito", d: "Revisa cantidades y subtotal en COP." },
-            { t: "Checkout", d: "Datos comerciales y pago vía API." },
-            { t: "Instalación", d: "Descargas Electron/Android según rol." },
+            { t: "Checkout", d: "Datos comerciales y pago en línea." },
+            { t: "Instalación", d: "Descargas Windows o Android según rol." },
           ].map((step, i) => (
             <li key={step.t} className="bg-white/70 p-5">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--yellow)] bg-[var(--navy)] inline-block px-2 py-1">
@@ -335,19 +401,19 @@ export default async function HomePage() {
         </div>
       </Section>
 
-      <Section tone="navy" eyebrow="Contacto" title="Hablemos de tu punto de venta" lead="Asesoría comercial, demos y seguimiento de pedidos.">
-        <div className="flex flex-wrap gap-3">
-          <Link href="/contacto">
-            <Button size="lg">Contacto</Button>
+      <Section tone="navy" eyebrow="Contacto" title="Hablemos de tu punto de venta" lead="Asesoría comercial, prueba de 5 días y seguimiento de pedidos.">
+        <div className="cta-row">
+          <Link href="/contratar" className="inline-flex max-w-full">
+            <Button size="lg">Contratar ahora</Button>
           </Link>
-          <Link href="/solicitar-demo">
-            <Button size="lg" variant="outline" className="border-[var(--ivory)] text-[var(--ivory)]">
-              Solicitar demo
+          <Link href="/prueba-5-dias" className="inline-flex max-w-full">
+            <Button size="lg" variant="outline" className="border-[var(--yellow)] text-[var(--yellow)] hover:bg-white/10">
+              Prueba 5 días
             </Button>
           </Link>
-          <Link href="/contratar">
-            <Button size="lg" variant="ghost" className="text-[var(--yellow)]">
-              Contratar ahora
+          <Link href="/contacto" className="inline-flex max-w-full">
+            <Button size="lg" variant="ghost" className="text-[var(--ivory)] hover:bg-white/10">
+              Contacto
             </Button>
           </Link>
         </div>

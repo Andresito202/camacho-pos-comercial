@@ -4,7 +4,7 @@ import { buildMetadata } from "@/lib/seo";
 
 export const metadata = buildMetadata({
   title: "Blog",
-  description: "Artículos de Camacho POS Colombia sobre local-first, kits por sector y roles.",
+  description: "Artículos de Camacho POS Colombia sobre operación de caja, kits por sector y roles.",
   path: "/blog",
 });
 

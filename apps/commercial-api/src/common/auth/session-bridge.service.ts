@@ -1,5 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { AppConfigService } from "../../config/config.service.js";
+import { RateLimitService } from "../rate-limit/rate-limit.service.js";
 
 export type CommercialRole = "SUPERADMIN_GLOBAL" | "BUSINESS_ADMIN" | "CUSTOMER" | "ANONYMOUS";
 
@@ -9,6 +10,7 @@ export interface BridgedSession {
   readonly subjectId: string | null;
   readonly tenantId: string | null;
   readonly reason?: string;
+  readonly verifiedAuthority?: "GLOBAL";
 }
 
 /**
@@ -18,9 +20,18 @@ export interface BridgedSession {
  */
 @Injectable()
 export class SessionBridgeService {
-  constructor(@Inject(AppConfigService) private readonly config: AppConfigService) {}
+  constructor(
+    @Inject(AppConfigService) private readonly config: AppConfigService,
+    @Inject(RateLimitService) private readonly rateLimit: RateLimitService,
+  ) {}
 
   async resolve(authorizationHeader: string | undefined): Promise<BridgedSession> {
+    // Harden admin login spray: throttle only when a Bearer token is presented.
+    if (authorizationHeader?.startsWith("Bearer ")) {
+      const throttleKey = `admin-session:${authorizationHeader.slice(0, 32)}`;
+      this.rateLimit.assert(throttleKey, 60, 60_000);
+    }
+
     const origin = this.config.env.CENTRAL_AUTHORITY_ORIGIN?.trim();
     if (!origin) {
       return {
@@ -63,9 +74,8 @@ export class SessionBridgeService {
       };
     }
 
-    // Test/dev escape hatch: explicit bridge token shape used only when Central is configured
-    // and bridge enabled. Real deployment must call Central HTTPS contracts.
-    if (token.startsWith("central-test:")) {
+    // Non-production escape hatch ONLY. Never honored when NODE_ENV=production.
+    if (this.config.env.NODE_ENV !== "production" && token.startsWith("central-test:")) {
       const role = token.slice("central-test:".length) as CommercialRole;
       if (role === "SUPERADMIN_GLOBAL" || role === "BUSINESS_ADMIN") {
         return {
@@ -80,6 +90,7 @@ export class SessionBridgeService {
     try {
       const response = await fetch(`${origin}/v1/sessions/introspect`, {
         method: "POST",
+        redirect: "error",
         headers: {
           authorization: `Bearer ${token}`,
           accept: "application/json",
@@ -114,11 +125,14 @@ export class SessionBridgeService {
         };
       }
       const role = mapCentralRole(body.role, body.authority);
+      const verifiedGlobal = new URL(origin).protocol === "https:" && body.active === true &&
+        body.authority === "GLOBAL" && body.role === "SUPERADMIN_GLOBAL" && body.tenantId === "global";
       return {
         authenticated: true,
         role,
         subjectId: body.subjectId ?? null,
         tenantId: body.tenantId ?? null,
+        ...(verifiedGlobal ? { verifiedAuthority: "GLOBAL" as const } : {}),
       };
     } catch {
       return {

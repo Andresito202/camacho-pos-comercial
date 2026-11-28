@@ -5,7 +5,7 @@ import { getLoginHref, postLoginDestination } from "@/lib/auth";
 
 export const metadata = buildMetadata({
   title: "Descargas e instalación",
-  description: "Instalación Electron (Windows) y Android para cajeros Camacho POS Colombia. No hay POS web de mostrador.",
+  description: "Instalación Windows y Android para cajeros Camacho POS Colombia. No hay POS web de mostrador.",
   path: "/descargas",
 });
 
@@ -21,26 +21,26 @@ export default function DescargasPage() {
       </p>
       <div className="mt-8 space-y-5">
         <article className="border border-[var(--border)] bg-white/70 p-5">
-          <h2 className="font-serif text-2xl">Electron — Windows</h2>
+          <h2 className="font-serif text-2xl">Windows — aplicación de caja</h2>
           <p className="mt-2 text-sm text-[var(--steel)]">
-            Tras contratar, el canal comercial entrega el instalador firmado del POS Desktop y la guía del POS Local Service
-            (único writer SQLite). Requiere host Windows del kit homologado.
+            La entrega del instalador firmado y de la guía de puesta en marcha depende de la publicación de la versión
+            certificada para el equipo. Consulta su disponibilidad con soporte.
           </p>
-          <p className="mt-3 text-xs text-[var(--muted)]">El binario no se publica en abierto sin licencia activa.</p>
+          <p className="mt-3 text-xs text-[var(--muted)]">El instalador no se publica en abierto sin licencia activa.</p>
         </article>
         <article className="border border-[var(--border)] bg-white/70 p-5">
           <h2 className="font-serif text-2xl">Android — caja móvil / mostrador</h2>
           <p className="mt-2 text-sm text-[var(--steel)]">
-            La app Android del kit se provisiona por el canal comercial. No uses APK de terceros.
+            Consulta con soporte la disponibilidad de la versión firmada para tu terminal Android.
           </p>
         </article>
         <article className="border border-[var(--yellow)] bg-[color-mix(in_srgb,var(--yellow)_14%,white)] p-5">
           <h2 className="font-serif text-2xl">Inicio de sesión</h2>
           <p className="mt-2 text-sm text-[var(--steel)]">
-            Un solo botón visible en el sitio lleva a Central Authority cuando está configurada.
+            Un solo botón visible en el sitio lleva al acceso de cuenta cuando está configurado.
           </p>
           {login.href ? (
-            <a href={login.href} className="mt-4 inline-block"><Button>Iniciar sesión en Central</Button></a>
+            <a href={login.href} className="mt-4 inline-block"><Button>Iniciar sesión</Button></a>
           ) : (
             <p className="mt-4 text-sm text-[var(--danger)]">{login.reason}</p>
           )}

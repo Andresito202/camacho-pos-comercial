@@ -6,7 +6,8 @@ import { buildMetadata, breadcrumbJsonLd, JsonLd } from "@/lib/seo";
 
 export const metadata = buildMetadata({
   title: "Soluciones por sector",
-  description: "Soluciones Camacho POS para tiendas, supermercados, droguerías, avícolas, panaderías y pastelerías.",
+  description:
+    "Soluciones Camacho POS para tiendas, supermercados, droguerías, avícolas, salsamentarias, panaderías y pastelerías.",
   path: "/soluciones",
 });
 
@@ -15,7 +16,11 @@ export default async function SolucionesPage() {
   return (
     <>
       <JsonLd data={breadcrumbJsonLd([{ name: "Inicio", path: "/" }, { name: "Soluciones", path: "/soluciones" }])} />
-      <Section eyebrow="Soluciones" title="Sector por sector, sin promesas genéricas" lead="Cada vertical lista retos reales y capacidades con su estado de materialización.">
+      <Section
+        eyebrow="Soluciones"
+        title="Sector por sector, sin promesas genéricas"
+        lead="Cada vertical lista retos reales y capacidades con su estado comercial actual."
+      >
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {solutions.data.map((s) => (
             <Link key={s.slug} href={`/soluciones/${s.slug}`} className="overflow-hidden bg-white/70">

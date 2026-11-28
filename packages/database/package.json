@@ -17,6 +17,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
+    "prisma:validate": "DATABASE_URL=\"${DATABASE_URL:-postgresql://validate:validate@127.0.0.1:5432/validate?schema=public}\" prisma validate",
     "prisma:seed": "tsx prisma/seed.ts",
     "prisma:studio": "prisma studio"
   },

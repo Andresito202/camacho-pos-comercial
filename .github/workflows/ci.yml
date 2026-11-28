@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "feat/**", "cursor/**"]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: Install · typecheck · lint · test · build · prisma
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: comercial
+          POSTGRES_PASSWORD: comercial_dev
+          POSTGRES_DB: camacho_pos_comercial
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U comercial -d camacho_pos_comercial"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://comercial:comercial_dev@127.0.0.1:5433/camacho_pos_comercial?schema=public
+      NODE_ENV: test
+      PORT: "4000"
+      FACTUS_PAY_MODE: SANDBOX
+      FACTUS_PAY_SANDBOX_ENABLED: "true"
+      FACTUS_PAY_PRODUCTION_ENABLED: "false"
+      FACTUS_PAY_SANDBOX_WEBHOOK_KEY: ci_sandbox_webhook_key_min_32_chars_xx
+      CENTRAL_AUTHORITY_ORIGIN: ""
+      CENTRAL_SESSION_BRIDGE_ENABLED: "false"
+      WHATSAPP_BUSINESS_NUMBER: 573000000000_DEV_PLACEHOLDER
+      PUBLIC_SITE_ORIGIN: http://127.0.0.1:3000
+      NEXT_PUBLIC_API_URL: http://127.0.0.1:4000
+      NEXT_PUBLIC_SITE_URL: http://127.0.0.1:3000
+      ALLOW_DRAFT_BUILD_FALLBACK: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # SCA — fail-closed on critical production advisories. High/moderate tracked via Dependabot
+      # (no prior audit gate in this repo). Does not disable typecheck/lint/test.
+      - name: Dependency audit (prod, critical)
+        run: pnpm audit --prod --audit-level=critical
+
+      - name: Prisma generate
+        run: pnpm prisma:generate
+
+      - name: Prisma validate
+        run: pnpm prisma:validate
+
+      - name: Prisma migrate deploy
+        run: pnpm prisma:migrate:deploy
+
+      # Workspace packages export types from dist/; build them before typecheck.
+      - name: Build contracts, configuration, database
+        run: pnpm --filter @camacho-pos-comercial/contracts --filter @camacho-pos-comercial/configuration --filter @camacho-pos-comercial/database run build
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build API
+        run: pnpm --filter @camacho-pos-comercial/commercial-api run build
+
+      - name: Build web
+        run: pnpm build:web
+
+      - name: Verify generated deployment files stay outside Git
+        run: node scripts/check-tracked-deployment-files.mjs
