@@ -161,7 +161,7 @@ export type Cart = {
 };
 
 export type CommercialCheckoutStatus =
-  | "WAITING_BINDING" | "QUEUED" | "PENDING_ACTIVATION" | "REQUIRES_REVIEW";
+  | "WAITING_BINDING" | "QUEUED" | "PENDING_ACTIVATION" | "PENDING_DELIVERY" | "FULFILLED" | "REQUIRES_REVIEW";
 
 export type CheckoutStatus = "pendiente" | "pagado" | "rechazado" | "expirado";
 

@@ -1,12 +1,14 @@
 import { ConflictException, Inject, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { createHash, randomInt } from "node:crypto";
 import { z } from "zod";
-import type { Prisma, PrismaClient } from "@camacho-pos-comercial/database";
+import { Prisma, type PrismaClient } from "@camacho-pos-comercial/database";
 import { PRISMA } from "../../common/prisma.tokens.js";
 import { AppConfigService } from "../../config/config.service.js";
 import { AuditService } from "../audit/audit.service.js";
 
 const retryableStatuses = ["PENDING", "QUEUED", "FAILED"] as const;
+const activationPollMs = 30_000;
+const billingInterval = z.enum(["PERPETUAL", "MONTHLY", "ANNUAL"]);
 const centralTimeoutMs = 20_000;
 const attemptLeaseMs = 60_000;
 const maxRetryDelayMs = 60 * 60_000;
@@ -16,6 +18,11 @@ const confirmedPayment = {
   some: { provider: "FACTUS_PAY", status: "PAID", paidAt: { not: null } },
 } as const;
 
+const paidOrderEvidence = {
+  provider: "FACTUS_PAY", environment: "SANDBOX", status: "PAID", paidAt: { not: null },
+  events: { some: { provider: "FACTUS_PAY", environment: "SANDBOX", eventType: "collection.paid" } },
+} satisfies Prisma.PaymentWhereInput;
+
 const eligibleOrder = {
   status: { in: [...paidOrderStatuses] }, deletedAt: null, payments: confirmedPayment,
 } satisfies Prisma.OrderWhereInput;
@@ -24,6 +31,7 @@ const boundOrderInclude = {
   items: { include: { planPrice: { select: { planId: true, version: true, centralPlanId: true, billingInterval: true } } } },
   customer: { select: { email: true } },
   businessProfile: true,
+  payments: { where: paidOrderEvidence, select: { referenceCode: true, paidAt: true, amountCents: true, currencyCode: true } },
 } satisfies Prisma.OrderInclude;
 type BoundOrder = Prisma.OrderGetPayload<{ include: typeof boundOrderInclude }>;
 
@@ -47,10 +55,12 @@ type SelectedBinding = Exclude<ReturnType<typeof bindingSelection>, { error: str
 
 function dueProvisioning(now: Date): Prisma.ProvisioningRequestWhereInput {
   return {
-    status: { in: [...retryableStatuses] },
     wirePreparedAt: { not: null },
     order: eligibleOrder,
-    OR: [{ nextRetryAt: null }, { nextRetryAt: { lte: now } }],
+    OR: [
+      { status: { in: [...retryableStatuses] }, OR: [{ nextRetryAt: null }, { nextRetryAt: { lte: now } }] },
+      { status: "SENT", nextRetryAt: { lte: now } },
+    ],
   };
 }
 
@@ -64,6 +74,17 @@ const centralResponse = z.object({
   fulfillment: z.enum(["QUEUED", "ISSUED", "ALREADY_QUEUED", "ALREADY_ISSUED"]),
   licenseIds: z.array(z.string().uuid()).max(10_000),
 }).strict();
+
+const activationResponse = z.object({
+  orderId: z.string().min(1),
+  provisioningId: z.string().min(8),
+  receipts: z.array(z.object({ licenseId: uuid, activationId: uuid, receiptId: uuid }).strict()).max(10_000),
+}).strict();
+
+const frozenPaidOrder = z.object({ companyId: uuid, paymentReference: z.string().min(1),
+  paidAt: z.string().datetime(), billingInterval }).strict();
+const issuance = z.object({ centralProvisioningId: z.string().min(8), centralLicenseIds: z.array(uuid).min(1).max(10_000),
+  orderId: z.string().min(1), paidOrder: frozenPaidOrder });
 
 /**
  * ProvisioningRequest outbox → Central license issuance.
@@ -107,9 +128,11 @@ export class ProvisioningService {
         const { price, planId, profile, lines } = selection;
         const tenant = uuid.safeParse(profile.centralTenantId);
         const plan = uuid.safeParse(price?.centralPlanId);
-        if (price?.billingInterval === "PERPETUAL" && price.planId === planId &&
+        const company = uuid.safeParse(profile.centralCompanyId);
+        if (price?.planId === planId && (company.success
+              ? billingInterval.safeParse(price.billingInterval).success : price.billingInterval === "PERPETUAL") &&
             lines.every(line => line.priceVersion === price.version) && tenant.success && plan.success) {
-          return this.freezeBinding(tx, order, selection, request.id, tenant.data, plan.data);
+          return this.freezeBinding(tx, order, selection, request.id, tenant.data, plan.data, company.data);
         }
       }
     }
@@ -124,7 +147,7 @@ export class ProvisioningService {
     return request;
   }
 
-  async bindPaidOrder(orderId: string, actorId: string, centralTenantId: string, centralPlanId: string) {
+  async bindPaidOrder(orderId: string, actorId: string, centralTenantId: string, centralPlanId: string, centralCompanyId?: string) {
     return this.prisma.$transaction(async tx => {
       const order = await tx.order.findFirst({
         where: { ...eligibleOrder, id: orderId },
@@ -139,7 +162,8 @@ export class ProvisioningService {
       if (!request) throw new NotFoundException({ code: "PROVISION_REQUEST_NOT_FOUND" });
       if (request.wirePreparedAt) {
         const payload = request.payload as Record<string, unknown>;
-        if (payload.tenantId !== centralTenantId || payload.planId !== centralPlanId) {
+        if (payload.tenantId !== centralTenantId || payload.planId !== centralPlanId ||
+            (centralCompanyId && frozenPaidOrder.safeParse(payload.paidOrder).data?.companyId !== centralCompanyId)) {
           throw new ConflictException({ code: "PROVISION_BINDING_ALREADY_FROZEN" });
         }
         return { id: request.id, status: request.status };
@@ -157,21 +181,33 @@ export class ProvisioningService {
       });
       if (plan.count !== 1) throw new ConflictException({ code: "PROVISION_PLAN_BINDING_CONFLICT" });
       const company = await tx.businessProfile.updateMany({
-        where: { id: profile.id, deletedAt: null, OR: [{ centralTenantId: null }, { centralTenantId }] },
-        data: { centralTenantId },
+        where: { id: profile.id, deletedAt: null, OR: [{ centralTenantId: null }, { centralTenantId }],
+          ...(centralCompanyId ? { AND: [{ OR: [{ centralCompanyId: null }, { centralCompanyId }] }] } : {}) },
+        data: { centralTenantId, ...(centralCompanyId ? { centralCompanyId } : {}) },
       });
       if (company.count !== 1) throw new ConflictException({ code: "PROVISION_TENANT_BINDING_CONFLICT" });
 
-      return this.freezeBinding(tx, order, selection, request.id, centralTenantId, centralPlanId, actorId);
+      return this.freezeBinding(tx, order, selection, request.id, centralTenantId, centralPlanId, centralCompanyId ?? profile.centralCompanyId ?? undefined, actorId);
     });
   }
 
   private async freezeBinding(
     tx: Prisma.TransactionClient, order: BoundOrder, selection: SelectedBinding, requestId: string,
-    centralTenantId: string, centralPlanId: string, actorId?: string,
+    centralTenantId: string, centralPlanId: string, centralCompanyId?: string, actorId?: string,
   ) {
     const { profile, planPriceId, lines, units } = selection;
     const orderId = order.id;
+    const matchingPayments = order.payments.filter(payment => payment.amountCents === order.totalCents &&
+      payment.currencyCode === order.currencyCode && payment.paidAt?.getTime() === order.paidAt?.getTime());
+    const payment = matchingPayments.length === 1 ? matchingPayments[0] : undefined;
+    const paidOrder = centralCompanyId ? frozenPaidOrder.safeParse({
+      companyId: centralCompanyId, paymentReference: payment?.referenceCode, paidAt: payment?.paidAt?.toISOString(),
+      billingInterval: selection.price?.billingInterval,
+    }) : null;
+    if (paidOrder && (!paidOrder.success || !selection.price ||
+        lines.some(line => line.priceVersion !== selection.price?.version))) {
+      throw new ConflictException({ code: "PROVISION_CONFIRMED_PAYMENT_OR_CONTRACT_REQUIRED" });
+    }
     const prepared = await tx.provisioningRequest.updateMany({
       where: {
         id: requestId, status: { in: [...retryableStatuses] }, wirePreparedAt: null,
@@ -184,6 +220,7 @@ export class ProvisioningService {
           orderId, orderNumber: order.orderNumber, customerEmail: order.customer.email,
           businessProfileId: profile.id, tenantId: centralTenantId, planId: centralPlanId,
           licenseUnits: units, cajaRule: "ONE_LICENSE_ONE_CAJA",
+          ...(paidOrder?.success ? { paidOrder: paidOrder.data } : {}),
           items: lines.map(line => ({
             label: line.label, quantity: line.quantity, planId: centralPlanId,
             priceVersion: line.priceVersion, unitAmountCents: line.unitAmountCents,
@@ -201,7 +238,7 @@ export class ProvisioningService {
       actorType: actorId ? "ADMIN" : "SYSTEM", actorId,
       action: actorId ? "PROVISIONING_BINDING_PREPARED" : "PROVISIONING_BINDING_REUSED",
       entityType: "ProvisioningRequest", entityId: requestId,
-      metadata: { orderId, centralPlanId, centralTenantId, planPriceId },
+      metadata: { orderId, centralPlanId, centralTenantId, centralCompanyId: centralCompanyId ?? null, planPriceId },
     }, tx);
     return { id: requestId, status: "QUEUED" as const };
   }
@@ -209,7 +246,7 @@ export class ProvisioningService {
   async processDue(limit = 20) {
     const due = await this.prisma.provisioningRequest.findMany({
       where: dueProvisioning(await this.databaseTime()),
-      select: { id: true, attemptCount: true, idempotencyKey: true, payload: true },
+      select: { id: true, attemptCount: true, idempotencyKey: true, payload: true, status: true, orderId: true },
       take: limit,
       orderBy: [{ nextRetryAt: "asc" }, { createdAt: "asc" }, { id: "asc" }],
     });
@@ -227,7 +264,7 @@ export class ProvisioningService {
   }
 
   private async attemptSend(item: Pick<Prisma.ProvisioningRequestGetPayload<object>,
-    "id" | "attemptCount" | "idempotencyKey" | "payload">) {
+    "id" | "attemptCount" | "idempotencyKey" | "payload" | "status" | "orderId">) {
     const { id } = item;
     const payload = item.payload as Record<string, unknown>;
     if (!uuid.safeParse(payload?.tenantId).success || !uuid.safeParse(payload?.planId).success) {
@@ -248,7 +285,7 @@ export class ProvisioningService {
         where: {
           id,
           attemptCount: item.attemptCount + 1,
-          status: { in: [...retryableStatuses] },
+          status: item.status,
           order: eligibleOrder,
         },
         data,
@@ -260,23 +297,52 @@ export class ProvisioningService {
       const databaseNow = await this.databaseTime();
       return new Date(databaseNow.getTime() + randomInt(Math.floor(retryDelay * 0.8), retryDelay + 1));
     };
-    // Central's current order issuer gives licenses no expiry. Keep this path
-    // disabled in production while commercial term and activation are uncertified.
+    const deferredStatus = item.status === "SENT" ? "SENT" : "PENDING";
+    // Production issuance and polling remain disabled pending certification.
     if (this.config.isProduction) {
-      const saved = await persist({ status: "PENDING", lastError: "PROVISION_PRODUCTION_NOT_CERTIFIED", nextRetryAt: await retryAt() });
-      return { id, status: saved ? "PENDING" : "UNCHANGED" };
+      const saved = await persist({ status: deferredStatus, lastError: "PROVISION_PRODUCTION_NOT_CERTIFIED", nextRetryAt: await retryAt() });
+      return { id, status: saved ? deferredStatus : "UNCHANGED" };
     }
     const origin = this.config.centralOrigin();
     const bridgeKey = this.config.env.COMMERCIAL_BRIDGE_KEY?.trim() ?? "";
     if (!origin || bridgeKey.length < 32) {
       const lastError = origin ? "PENDING_COMMERCIAL_BRIDGE_KEY" : "PENDING_CENTRAL_CREDENTIALS";
-      const saved = await persist({ status: "PENDING", lastError, nextRetryAt: await retryAt() });
+      const saved = await persist({ status: deferredStatus, lastError, nextRetryAt: await retryAt() });
       if (saved) this.logger.warn(`Provisioning ${id} deferred: ${lastError}`);
-      return { id, status: saved ? "PENDING" : "UNCHANGED" };
+      return { id, status: saved ? deferredStatus : "UNCHANGED" };
     }
 
     const path = this.config.env.CENTRAL_PROVISIONING_PATH || "/v1/commercial/provisioning";
     try {
+      const lease = item.attemptCount + 1;
+      if (item.status === "SENT") {
+        const bound = issuance.parse(payload);
+        if (bound.orderId !== item.orderId) throw new Error("CENTRAL_PROVISIONING_ORDER_MISMATCH");
+        const response = await fetch(`${origin}/v1/commercial/provisioning/activation-status`, {
+          method: "POST", redirect: "error",
+          headers: { "content-type": "application/json", "idempotency-key": item.idempotencyKey,
+            "x-central-commercial-bridge-key": bridgeKey },
+          body: JSON.stringify({ orderId: bound.orderId, provisioningId: bound.centralProvisioningId }),
+          signal: AbortSignal.timeout(centralTimeoutMs),
+        });
+        if (!response.ok) throw new Error(`CENTRAL_ACTIVATION_HTTP_${response.status}`);
+        const evidence = activationResponse.parse(await response.json());
+        const expected = new Set(bound.centralLicenseIds);
+        const received = new Set(evidence.receipts.map(receipt => receipt.licenseId));
+        if (evidence.orderId !== bound.orderId || evidence.provisioningId !== bound.centralProvisioningId ||
+            expected.size !== bound.centralLicenseIds.length || received.size !== evidence.receipts.length ||
+            new Set(evidence.receipts.map(receipt => receipt.receiptId)).size !== received.size ||
+            new Set(evidence.receipts.map(receipt => receipt.activationId)).size !== received.size ||
+            [...received].some(licenseId => !expected.has(licenseId))) {
+          throw new Error("CENTRAL_ACTIVATION_EVIDENCE_MISMATCH");
+        }
+        if (received.size < expected.size) {
+          const saved = await persist({ activationVerifiedAt: null, activationReceipts: Prisma.DbNull,
+            lastError: "CENTRAL_ACTIVATION_PENDING", nextRetryAt: new Date((await this.databaseTime()).getTime() + activationPollMs) });
+          return { id, status: saved ? "SENT" : "UNCHANGED" };
+        }
+        return await this.completeOrder(id, lease, bound, evidence.receipts);
+      }
       const response = await fetch(`${origin}${path}`, {
         method: "POST",
         redirect: "error",
@@ -309,7 +375,7 @@ export class ProvisioningService {
       const saved = await persist({
         status: issued ? "SENT" : "QUEUED",
         lastError: issued ? null : `CENTRAL_FULFILLMENT_${body.fulfillment}`,
-        nextRetryAt: issued ? null : await retryAt(),
+        nextRetryAt: issued ? (payload.paidOrder ? await this.databaseTime() : null) : await retryAt(),
         acknowledgedAt: new Date(),
         ...(issued ? {
           payload: {
@@ -323,8 +389,52 @@ export class ProvisioningService {
       return { id, status: issued ? "SENT" : "QUEUED", fulfillment: body.fulfillment, licenseIds: body.licenseIds };
     } catch (error) {
       const message = error instanceof Error ? error.message : "UNKNOWN";
-      const saved = await persist({ status: "FAILED", lastError: message, nextRetryAt: await retryAt() });
-      return { id, status: saved ? "FAILED" : "UNCHANGED" };
+      const status = item.status === "SENT" ? "SENT" : "FAILED";
+      const saved = await persist({ status, lastError: message, nextRetryAt: await retryAt() });
+      return { id, status: saved ? status : "UNCHANGED" };
     }
+  }
+
+  private async completeOrder(
+    id: string, lease: number, bound: z.infer<typeof issuance>,
+    receipts: z.infer<typeof activationResponse>["receipts"],
+  ) {
+    return this.prisma.$transaction(async tx => {
+      // Shipment and cancellation transitions use the same order-row lock.
+      await tx.$queryRaw`SELECT id FROM "Order" WHERE id=${bound.orderId} FOR UPDATE`;
+      const order = await tx.order.findFirst({
+        where: { ...eligibleOrder, id: bound.orderId, payments: { some: {
+          ...paidOrderEvidence, referenceCode: bound.paidOrder.paymentReference, paidAt: new Date(bound.paidOrder.paidAt),
+        } } },
+        select: {
+          items: { select: { productId: true, productVariantId: true, kitId: true } },
+          shipments: { orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 1,
+            select: { status: true, deliveredAt: true } },
+        },
+      });
+      if (!order) return { id, status: "UNCHANGED" };
+      const hardware = order.items.some(item => item.productId || item.productVariantId || item.kitId);
+      const shipment = order.shipments[0];
+      const complete = !hardware || (shipment?.status === "DELIVERED" && shipment.deliveredAt !== null);
+      const [clock] = await tx.$queryRaw<{ now: Date }[]>`SELECT statement_timestamp() AS now`;
+      const verifiedAt = clock!.now;
+      const saved = await tx.provisioningRequest.updateMany({
+        where: { id, orderId: bound.orderId, attemptCount: lease, status: "SENT" },
+        data: {
+          status: complete ? "ACKNOWLEDGED" : "SENT", activationVerifiedAt: verifiedAt, activationReceipts: receipts,
+          lastError: complete ? null : "PROVISION_DELIVERY_PENDING",
+          nextRetryAt: complete ? null : new Date(verifiedAt.getTime() + activationPollMs),
+        },
+      });
+      if (saved.count !== 1) return { id, status: "UNCHANGED" };
+      if (!complete) return { id, status: "SENT" };
+      await tx.order.update({ where: { id: bound.orderId }, data: { status: "FULFILLED" } });
+      await this.audit.record({
+        actorType: "SYSTEM", action: "PROVISIONING_ORDER_COMPLETED", entityType: "Order", entityId: bound.orderId,
+        metadata: { provisioningRequestId: id, centralProvisioningId: bound.centralProvisioningId,
+          licenses: receipts.length },
+      }, tx);
+      return { id, status: "ACKNOWLEDGED" };
+    });
   }
 }

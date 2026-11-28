@@ -30,7 +30,7 @@ type OrderRow = {
     carrier?: string | null;
     trackingCode?: string | null;
   }>;
-  businessProfile?: { legalName: string; centralTenantId: string | null } | null;
+  businessProfile?: { legalName: string; centralTenantId: string | null; centralCompanyId: string | null } | null;
   provisioning?: Array<{
     status: string; lastError: string | null; attemptCount: number;
     acknowledgedAt: string | null; wirePreparedAt: string | null;
@@ -165,9 +165,13 @@ export default async function AdminPedidosPage({ searchParams }: Props) {
                           submitLabel="Guardar vinculación"
                           fields={[
                             {
-                              name: "centralTenantId", label: "UUID de empresa en Central", required: true,
+                              name: "centralTenantId", label: "UUID del tenant en Central", required: true,
                               defaultValue: order.businessProfile!.centralTenantId ?? "",
                               hint: "Usa la empresa autorizada en Central para este comprador.",
+                            },
+                            {
+                              name: "centralCompanyId", label: "UUID de empresa en Central", required: true,
+                              defaultValue: order.businessProfile!.centralCompanyId ?? "",
                             },
                             {
                               name: "centralPlanId", label: "UUID de plan en Central",

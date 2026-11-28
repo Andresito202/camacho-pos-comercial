@@ -33,19 +33,23 @@ export class PaymentsController {
             items: { where: { planPriceId: { not: null } }, select: { id: true }, take: 1 },
             provisioning: {
               orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 1,
-              select: { status: true, lastError: true, wirePreparedAt: true, attemptCount: true, acknowledgedAt: true },
+              select: { status: true, lastError: true, wirePreparedAt: true, attemptCount: true, acknowledgedAt: true, activationVerifiedAt: true },
             },
           },
         },
       },
     });
     const { order, ...publicPayment } = payment;
-    let commercialStatus: "WAITING_BINDING" | "QUEUED" | "PENDING_ACTIVATION" | "REQUIRES_REVIEW" | null = null;
+    let commercialStatus: "WAITING_BINDING" | "QUEUED" | "PENDING_ACTIVATION" | "PENDING_DELIVERY" | "FULFILLED" | "REQUIRES_REVIEW" | null = null;
     if (payment.provider === "FACTUS_PAY" && payment.status === "PAID" && payment.paidAt &&
         !order.deletedAt && ["PAID", "PROVISIONING", "FULFILLED"].includes(order.status) && order.items.length > 0) {
       const request = order.provisioning[0];
       if (!request) commercialStatus = "REQUIRES_REVIEW";
-      else if (request.status === "SENT" && request.wirePreparedAt !== null) commercialStatus = "PENDING_ACTIVATION";
+      else if (request.status === "ACKNOWLEDGED" && request.activationVerifiedAt && order.status === "FULFILLED") commercialStatus = "FULFILLED";
+      else if (request.status === "SENT" && request.wirePreparedAt !== null) {
+        commercialStatus = request.activationVerifiedAt && request.lastError === "PROVISION_DELIVERY_PENDING"
+          ? "PENDING_DELIVERY" : "PENDING_ACTIVATION";
+      }
       else if (["FAILED", "CANCELLED", "ACKNOWLEDGED", "SENT"].includes(request.status) ||
           request.lastError === "PROVISION_PRODUCTION_NOT_CERTIFIED" ||
           (!request.wirePreparedAt && (request.attemptCount > 0 || request.acknowledgedAt !== null))) {

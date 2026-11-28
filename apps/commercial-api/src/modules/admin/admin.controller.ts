@@ -696,7 +696,7 @@ export class AdminController {
           },
         },
         shipments: true,
-        businessProfile: { select: { legalName: true, centralTenantId: true } },
+        businessProfile: { select: { legalName: true, centralTenantId: true, centralCompanyId: true } },
         provisioning: {
           orderBy: { createdAt: "desc" }, take: 1,
           select: {
@@ -717,23 +717,20 @@ export class AdminController {
     @Req() req: { commercialSession?: BridgedSession },
   ) {
     const input = OrderActionSchema.parse(body);
-    const order = await this.prisma.order.findFirst({
-      where: { id, deletedAt: null },
-      include: {
-        payments: true,
-        shipments: { orderBy: { createdAt: "desc" } },
-        items: true,
-      },
-    });
-    if (!order) throw new NotFoundException({ code: "ORDER_NOT_FOUND" });
-
     const actorId = this.actor(req);
-    const latestShipment = order.shipments[0] ?? null;
-    const hasHardware = order.items.some(
-      (item) => Boolean(item.productId) || Boolean(item.productVariantId) || Boolean(item.kitId),
-    );
-
     const result = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "Order" WHERE id=${id} FOR UPDATE`;
+      const order = await tx.order.findFirst({
+        where: { id, deletedAt: null },
+        include: {
+          payments: true,
+          shipments: { orderBy: [{ createdAt: "desc" }, { id: "desc" }] },
+          items: true,
+        },
+      });
+      if (!order) throw new NotFoundException({ code: "ORDER_NOT_FOUND" });
+      const latestShipment = order.shipments[0] ?? null;
+      const hasHardware = order.items.some(item => item.productId || item.productVariantId || item.kitId);
       switch (input.action) {
         case "PREPARE_SHIPMENT":
         case "MARK_READY": {

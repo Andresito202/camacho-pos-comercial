@@ -234,6 +234,7 @@ model CommercialCustomer {
 model BusinessProfile {
   id           String    @id @default(cuid())
   centralTenantId String? @db.Uuid
+  centralCompanyId String? @unique @db.Uuid
   customerId   String
   legalName    String
   tradeName    String?
@@ -835,6 +836,8 @@ model ProvisioningRequest {
   idempotencyKey String             @unique
   payload        Json
   wirePreparedAt DateTime?
+  activationVerifiedAt DateTime?
+  activationReceipts Json?
   attemptCount   Int                @default(0)
   lastError      String?
   nextRetryAt    DateTime?

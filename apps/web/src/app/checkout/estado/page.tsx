@@ -15,6 +15,8 @@ const commercialLabels: Record<CommercialCheckoutStatus, string> = {
   WAITING_BINDING: "Pendiente de vincular la empresa y el plan.",
   QUEUED: "Solicitud en cola de aprovisionamiento.",
   PENDING_ACTIVATION: "Licencia registrada en Central. Activación pendiente.",
+  PENDING_DELIVERY: "Activación confirmada. Entrega de equipos pendiente.",
+  FULFILLED: "Pedido completado.",
   REQUIRES_REVIEW: "La solicitud requiere revisión por soporte comercial.",
 };
 

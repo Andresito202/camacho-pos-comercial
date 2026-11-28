@@ -18,13 +18,14 @@ export class ProvisioningController {
     const input = z.object({
       centralTenantId: z.string().trim().uuid(),
       centralPlanId: z.string().trim().uuid(),
+      centralCompanyId: z.string().trim().uuid().optional(),
     }).strict().safeParse(body);
     if (!input.success) throw new BadRequestException({ code: "PROVISION_BINDING_INVALID" });
     const actorId = req.commercialSession.subjectId;
     if (!actorId) throw new ForbiddenException({ code: "PROVISION_ADMIN_ID_REQUIRED" });
     return this.provisioning.bindPaidOrder(
       orderId, actorId, input.data.centralTenantId.toLowerCase(),
-      input.data.centralPlanId.toLowerCase(),
+      input.data.centralPlanId.toLowerCase(), input.data.centralCompanyId?.toLowerCase(),
     );
   }
 
