@@ -793,10 +793,10 @@ export class AdminController {
             where: { id: latestShipment.id },
             data: { status: "DELIVERED", deliveredAt: new Date() },
           });
-          const updatedOrder = await tx.order.update({
-            where: { id: order.id },
-            data: { status: "FULFILLED" },
-          });
+          const requiresActivation = order.items.some(item => item.planId !== null || item.planPriceId !== null);
+          const updatedOrder = requiresActivation
+            ? await tx.order.findUniqueOrThrow({ where: { id: order.id } })
+            : await tx.order.update({ where: { id: order.id }, data: { status: "FULFILLED" } });
           return { order: updatedOrder, shipment };
         }
         case "CANCEL": {

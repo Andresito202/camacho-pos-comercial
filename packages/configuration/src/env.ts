@@ -23,6 +23,7 @@ export const EnvSchema = z
      * (`X-Central-Commercial-Bridge-Key`). Required for live provisioning/trial issue calls.
      */
     COMMERCIAL_BRIDGE_KEY: z.string().optional().default(""),
+    COMMERCIAL_PROVISIONING_WORKER_ENABLED: boolFromEnv.default(false),
 
     /**
      * Configured environment intent. Resolved runtime gate is MOCK | SANDBOX | PRODUCTION

@@ -373,6 +373,40 @@ describe("commercial-api critical paths", () => {
     }
   });
 
+  it.each([true, false])("records hardware delivery with software present: %s", async requiresActivation => {
+    const idempotencyKey = randomUUID();
+    const customer = await prisma.commercialCustomer.create({
+      data: { email: `${idempotencyKey}@example.test`, fullName: "Entrega fixture" },
+    });
+    const order = await prisma.order.create({
+      data: {
+        customerId: customer.id, orderNumber: idempotencyKey, idempotencyKey,
+        status: "PROVISIONING", subtotalCents: 100, totalCents: 100,
+        items: { create: { label: "Pedido de prueba", quantity: 1, unitAmountCents: 100, lineTotalCents: 100, priceVersion: 1,
+          ...(requiresActivation ? { planPriceId: publishablePriceId } : {}) } },
+        shipments: { create: { status: "SHIPPED", amountCents: 0, shippedAt: new Date() } },
+      },
+    });
+    const { AppConfigService } = await import("../src/config/config.service.js");
+    const config = app.get(AppConfigService);
+    const previous = config.env.ALLOW_ADMIN_TEST_FIXTURE;
+    config.env.ALLOW_ADMIN_TEST_FIXTURE = true;
+    try {
+      const response = await inject("PATCH", `/v1/admin/pedidos/${order.id}`, {
+        payload: { action: "DELIVER" },
+        headers: { "x-admin-test-fixture": "GLOBAL_SUPERADMIN" },
+      });
+      const expectedStatus = requiresActivation ? "PROVISIONING" : "FULFILLED";
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({ order: { status: expectedStatus }, shipment: { status: "DELIVERED" } });
+      const stored = await prisma.order.findUniqueOrThrow({ where: { id: order.id }, include: { shipments: true } });
+      expect(stored.status).toBe(expectedStatus);
+      expect(stored.shipments).toMatchObject([{ status: "DELIVERED", deliveredAt: expect.any(Date) }]);
+    } finally {
+      config.env.ALLOW_ADMIN_TEST_FIXTURE = previous;
+    }
+  });
+
   it("binds paid orders through GLOBAL and freezes the Central UUID payload in PostgreSQL", async () => {
     const unique = randomUUID();
     const customer = await prisma.commercialCustomer.create({
@@ -492,6 +526,9 @@ describe("commercial-api critical paths", () => {
     const previousKey = config.env.COMMERCIAL_BRIDGE_KEY;
     config.env.ALLOW_ADMIN_TEST_FIXTURE = true;
     config.env.COMMERCIAL_BRIDGE_KEY = randomUUID().replaceAll("-", "");
+    const { ProvisioningScheduler } = await import("../src/modules/provisioning/provisioning-scheduler.js");
+    const scheduler = app.get(ProvisioningScheduler);
+    const previousScheduler = config.env.COMMERCIAL_PROVISIONING_WORKER_ENABLED;
     const worker = () => inject("POST", workerPath, { headers: { "x-admin-test-fixture": "GLOBAL_SUPERADMIN" } });
     try {
       const deferred = await worker();
@@ -510,7 +547,21 @@ describe("commercial-api critical paths", () => {
         status: "SENT", attemptCount: 2, nextRetryAt: null,
         payload: { centralLicenseIds: [issuedLicenseId] },
       });
+
+      const automatic = await buyAgain(1);
+      expect(automatic.state).toMatchObject({ commercialStatus: "QUEUED" });
+      config.env.COMMERCIAL_PROVISIONING_WORKER_ENABLED = true;
+      scheduler.onApplicationBootstrap();
+      await vi.waitFor(async () => {
+        expect(await prisma.provisioningRequest.findUniqueOrThrow({ where: { id: automatic.request.id } }))
+          .toMatchObject({ status: "SENT", attemptCount: 1 });
+      }, { timeout: 5_000, interval: 50 });
+      expect(centralCalls).toBe(2);
+      expect(await prisma.order.findUniqueOrThrow({ where: { id: automatic.request.orderId } }))
+        .toMatchObject({ status: "PROVISIONING" });
     } finally {
+      await scheduler.onModuleDestroy();
+      config.env.COMMERCIAL_PROVISIONING_WORKER_ENABLED = previousScheduler;
       config.env.ALLOW_ADMIN_TEST_FIXTURE = previous;
       config.env.COMMERCIAL_BRIDGE_KEY = previousKey;
       origin.mockRestore();
