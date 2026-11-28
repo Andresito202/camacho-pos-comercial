@@ -1,0 +1,60 @@
+name: Commercial API invariants
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/commercial-api/**'
+      - 'packages/configuration/**'
+      - 'packages/contracts/**'
+      - 'packages/database/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/commercial-api-invariants.yml'
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  commercial-api:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: comercial
+          POSTGRES_DB: camacho_pos_comercial
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U comercial -d camacho_pos_comercial"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://comercial@127.0.0.1:5433/camacho_pos_comercial?schema=public
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm prisma:generate
+      - run: pnpm prisma:migrate:deploy
+      - run: pnpm prisma:seed
+      - name: Build runtime dependencies
+        run: |
+          for package in configuration contracts database; do
+            pnpm --filter "@camacho-pos-comercial/$package" exec tsc -b --force
+          done
+      - run: pnpm --filter @camacho-pos-comercial/commercial-api typecheck
+      - run: pnpm --filter @camacho-pos-comercial/commercial-api build
+      - run: pnpm --filter @camacho-pos-comercial/commercial-api test
